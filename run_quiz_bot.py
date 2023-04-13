@@ -2,7 +2,7 @@ import logging
 import time
 
 from environs import Env
-from telegram import Bot, Update
+from telegram import Bot, ReplyKeyboardMarkup, Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 from bot_logger import BotLogsHandler
@@ -11,11 +11,21 @@ logger = logging.getLogger(__file__)
 
 
 def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text(f'{update.effective_user.full_name}, будем знакомы, я Бот Ботыч!')
+    update.message.reply_text(
+        f'{update.effective_user.full_name}, будем знакомы - я Бот Ботыч 😍 \nДавай сыграем в викторину?!',
+        reply_markup=reply_markup,
+    )
 
 
 def send_echo_msg(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text(update.message.text)
+    if update.message.text == 'Новый вопрос':
+        update.message.reply_text('Новый вопрос+', reply_markup=reply_markup)
+    elif update.message.text == 'Сдаться':
+        update.message.reply_text('Тест - Сдаться', reply_markup=reply_markup)
+    elif update.message.text == 'Мой счёт':
+        update.message.reply_text('Тест - Мой счёт', reply_markup=reply_markup)
+    else:
+        update.message.reply_text('Я тебя не понял 😔 \nНажми на нужную на кнопку 👇', reply_markup=reply_markup)
 
 
 def send_err(update: Update, context: CallbackContext) -> None:
@@ -39,6 +49,9 @@ if __name__ == '__main__':
 
     bot = Bot(tg_token)
     tg_bot_name = f'@{bot.get_me().username}'
+    custom_keyboard = [['Новый вопрос', 'Сдаться'],
+                       ['Мой счёт']]
+    reply_markup = ReplyKeyboardMarkup(custom_keyboard)
 
     if not admin_tg_token:
         admin_tg_token = tg_token
@@ -48,6 +61,8 @@ if __name__ == '__main__':
         admin_tg_token=admin_tg_token,
         admin_tg_chat_id=admin_tg_chat_id,
     ))
+
+
 
     logger.info('Start Telegram bot.')
 
