@@ -52,10 +52,12 @@ if __name__ == '__main__':
 
     for quiz_file in quiz_folder_path.iterdir():
         if quiz_file.is_file():
-            quizzes[quiz_file] = parse_questions(quiz_file.read_text(encoding='KOI8-R'))
+            quizzes[quiz_file.name] = parse_questions(quiz_file.read_text(encoding='KOI8-R'))
 
-    with open(parser_folder_path / 'quizzes.json', 'w', encoding='UTF-8') as file:
-        json.dump(quiz_parser_errors, file, ensure_ascii=False, indent=4)
+    for file_name, questions in quizzes.items():
+        file_path = parser_folder_path / file_name
+        with open(file_path.with_suffix('.json'), 'w', encoding='UTF-8') as file:
+            json.dump(questions, file, ensure_ascii=False, indent=4)
 
     with open(parser_folder_path / 'errors.json', 'w', encoding='UTF-8') as file:
         json.dump(quiz_parser_errors, file, ensure_ascii=False, indent=4)
