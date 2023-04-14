@@ -19,7 +19,7 @@ def parse_questions(text: str) -> list[str]:
 
 def parse_question_notes(question: str, num: int) -> dict[str:str]:
     question_notes = {}
-    error_string_limit = 1000
+    error_str_limit = 1000
 
     for notes in question.strip().split('\n\n'):
         if notes:
@@ -27,21 +27,19 @@ def parse_question_notes(question: str, num: int) -> dict[str:str]:
                 notes = notes.split(':\n', maxsplit=1)
                 question_notes[notes[0]] = notes[1].strip()
 
-            except IndexError as err:
-                print(f'ERROR: {quiz_file} {err}')
-
+            except IndexError:
                 question_notes = {
                     f'ERROR': {
-                        'question': question[:error_string_limit],
-                        'bad_string': notes[0][:error_string_limit],
+                        'question': question[:error_str_limit],
+                        'crash_str': notes[0][:error_str_limit],
                         'traceback': traceback.format_exc(),
                     }
                 }
 
-                if not quiz_parser_errors.get(quiz_file.name):
-                     quiz_parser_errors[quiz_file.name] = {}
+                if not quizzes_errors.get(quiz_file.name):
+                     quizzes_errors[quiz_file.name] = {}
 
-                quiz_parser_errors[quiz_file.name][f'ERROR in question №{num}'] = question_notes['ERROR']
+                quizzes_errors[quiz_file.name][f'ERROR in question №{num}'] = question_notes['ERROR']
 
                 return question_notes
 
@@ -56,17 +54,14 @@ def sterilize_questions(questions: list) -> dict[int:dict[str:str]]:
 
 
 if __name__ == '__main__':
-    quiz_folder_path = Path('quiz-questions')
-    parser_folder_path = quiz_folder_path / 'quizzes_parser'
-    parser_errors_folder_path = parser_folder_path / 'errors'
-
+    quizzes_folder_path = Path('quiz-questions')
+    parser_folder_path = quizzes_folder_path / 'quizzes_parser'
     parser_folder_path.mkdir(exist_ok=True)
-    parser_errors_folder_path.mkdir(exist_ok=True)
 
     quizzes = {}
-    quiz_parser_errors = {}
+    quizzes_errors = {}
 
-    for quiz_file in quiz_folder_path.iterdir():
+    for quiz_file in quizzes_folder_path.iterdir():
         if quiz_file.is_file():
             quizzes[quiz_file.name] = parse_questions(quiz_file.read_text(encoding='KOI8-R'))
 
@@ -75,5 +70,9 @@ if __name__ == '__main__':
         with open(file_path.with_suffix('.json'), 'w', encoding='UTF-8') as file:
             json.dump(questions, file, ensure_ascii=False, indent=4)
 
-    with open(parser_errors_folder_path / 'errors.json', 'w', encoding='UTF-8') as file:
-        json.dump(quiz_parser_errors, file, ensure_ascii=False, indent=4)
+    if quizzes_errors:
+        parser_errors_folder_path = quizzes_folder_path / 'quizzes_parser_errors'
+        parser_errors_folder_path.mkdir(exist_ok=True)
+
+        with open(parser_errors_folder_path / 'errors.json', 'w', encoding='UTF-8') as file:
+            json.dump(quizzes_errors, file, ensure_ascii=False, indent=4)
