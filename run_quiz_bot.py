@@ -30,10 +30,10 @@ def start(update: Update, context: CallbackContext) -> None:
 def send_echo_msg(update: Update, context: CallbackContext) -> None:
     if update.message.text == 'Новый вопрос':
         questions = get_questions()
-        random_num = random.randrange(1, len(questions) + 1)
+        random_num = random.randrange(1, len(questions))
         question = questions[str(random_num)]['Вопрос']
 
-        update.message.reply_text(question, reply_markup=reply_markup)
+        update.message.reply_text(str(random_num) + question , reply_markup=reply_markup)
 
     elif update.message.text == 'Сдаться':
         update.message.reply_text('Тест - Сдаться', reply_markup=reply_markup)
