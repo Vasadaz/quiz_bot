@@ -1,7 +1,10 @@
+import json
 import logging
+import random
 import time
 
 from environs import Env
+from pathlib import Path
 from telegram import Bot, ReplyKeyboardMarkup, Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
@@ -9,6 +12,13 @@ from bot_logger import BotLogsHandler
 
 logger = logging.getLogger(__file__)
 
+
+def get_questions() -> dict[str:dict[str:str]]:
+    quizzes_path = Path('quiz-questions/quizzes_parser')
+    random_quizzes_file_path = random.choice([*quizzes_path.iterdir()])
+    questions = json.loads(random_quizzes_file_path.read_text(encoding='UTF-8'))
+
+    return questions
 
 def start(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(
@@ -19,11 +29,18 @@ def start(update: Update, context: CallbackContext) -> None:
 
 def send_echo_msg(update: Update, context: CallbackContext) -> None:
     if update.message.text == 'Новый вопрос':
-        update.message.reply_text('Новый вопрос+', reply_markup=reply_markup)
+        questions = get_questions()
+        random_num = random.randrange(1, len(questions) + 1)
+        question = questions[str(random_num)]['Вопрос']
+
+        update.message.reply_text(question, reply_markup=reply_markup)
+
     elif update.message.text == 'Сдаться':
         update.message.reply_text('Тест - Сдаться', reply_markup=reply_markup)
+
     elif update.message.text == 'Мой счёт':
         update.message.reply_text('Тест - Мой счёт', reply_markup=reply_markup)
+
     else:
         update.message.reply_text('Я тебя не понял 😔 \nНажми на нужную на кнопку 👇', reply_markup=reply_markup)
 
