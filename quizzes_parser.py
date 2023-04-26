@@ -87,8 +87,6 @@ if __name__ == '__main__':
     for file_name, questions in quizzes.items():
         file_path = parser_folder_path / file_name
         with open(file_path.with_suffix('.json'), 'w', encoding='UTF-8') as file:
-            import pprint
-            pprint.pprint(questions)
             json.dump(questions, file, ensure_ascii=False, indent=4)
 
     if quizzes_errors:
