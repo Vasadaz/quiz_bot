@@ -8,7 +8,11 @@ from pathlib import Path
 from telegram import Bot, ReplyKeyboardMarkup, Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
+import redis_db
+
 from bot_logger import BotLogsHandler
+
+
 
 logger = logging.getLogger(__file__)
 
@@ -27,13 +31,22 @@ def start(update: Update, context: CallbackContext) -> None:
     )
 
 
-def send_echo_msg(update: Update, context: CallbackContext) -> None:
+def send_msg(update: Update, context: CallbackContext) -> None:
     if update.message.text == 'Новый вопрос':
         questions = get_questions()
         random_num = random.randrange(1, len(questions))
-        question = questions[str(random_num)]['Вопрос']
+        question = questions[str(random_num)].get('Вопрос', '')
 
-        update.message.reply_text(str(random_num) + question , reply_markup=reply_markup)
+        while not question:
+            random_num = random.randrange(1, len(questions))
+            question = questions[str(random_num)].get('Вопрос', '')
+
+        update.message.reply_text(question , reply_markup=reply_markup)
+
+        print(update.message.chat.id)
+
+        db.set(update.message.chat.id, question)
+
 
     elif update.message.text == 'Сдаться':
         update.message.reply_text('Тест - Сдаться', reply_markup=reply_markup)
@@ -63,6 +76,9 @@ if __name__ == '__main__':
     tg_token = env.str('TELEGRAM_BOT_TOKEN')
     admin_tg_token = env.str('TELEGRAM_ADMIN_BOT_TOKEN', '')
     admin_tg_chat_id = env.str('TELEGRAM_ADMIN_CHAT_ID', '')
+    db_host = env.str('REDIS_HOST')
+    db_port = env.int('REDIS_PORT')
+    db_password = env.str('REDIS_PASSWORD')
 
     bot = Bot(tg_token)
     tg_bot_name = f'@{bot.get_me().username}'
@@ -79,8 +95,6 @@ if __name__ == '__main__':
         admin_tg_chat_id=admin_tg_chat_id,
     ))
 
-
-
     logger.info('Start Telegram bot.')
 
     while True:
@@ -90,10 +104,17 @@ if __name__ == '__main__':
             dispatcher = updater.dispatcher
             dispatcher.add_error_handler(send_err)
             dispatcher.add_handler(CommandHandler('start', start))
-            dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, send_echo_msg))
+            dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, send_msg))
+
+            db = redis_db.connect(
+                host=db_host,
+                port=db_port,
+                password=db_password,
+            )
 
             updater.start_polling()
             updater.idle()
+
         except Exception as error:
             logger.exception(error)
             time.sleep(60)
