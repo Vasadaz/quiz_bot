@@ -42,20 +42,35 @@ def send_msg(update: Update, context: CallbackContext) -> None:
             question = questions[str(random_num)].get('Вопрос', '')
 
         update.message.reply_text(question , reply_markup=reply_markup)
-
-        print(update.message.chat.id)
-
-        db.set(update.message.chat.id, question)
-
-
-    elif update.message.text == 'Сдаться':
-        update.message.reply_text('Тест - Сдаться', reply_markup=reply_markup)
+        db.set(update.message.chat.id, str(questions[str(random_num)]))
 
     elif update.message.text == 'Мой счёт':
         update.message.reply_text('Тест - Мой счёт', reply_markup=reply_markup)
 
     else:
-        update.message.reply_text('Я тебя не понял 😔 \nНажми на нужную на кнопку 👇', reply_markup=reply_markup)
+        try:
+            question_notes = eval(db.get(update.message.chat.id))
+            answer_notes = '\n'.join(f'{key}: {value}' for key, value in question_notes.items() if key != 'Вопрос')
+
+            if update.message.text == 'Сдаться':
+                answer = 'Бывает...\n' \
+                         'Вот что у меня есть по вопросу 👇\n\n' + answer_notes
+                db.delete(update.message.chat.id)
+
+            elif (update.message.text.lower().strip(' .,:"')) == question_notes['Ответ'].lower().strip(' .,:"'):
+                answer = f'Урааа! Совершенной верно 👌\n' \
+                         f'➕1️⃣ балл\n' \
+                         f'Вот что у меня есть по вопросу 👇\n\n' + answer_notes
+                db.delete(update.message.chat.id)
+
+            else:
+                answer = 'Ответ неверный 😔\nПодумай ещё 🤔'
+
+            update.message.reply_text(answer, reply_markup=reply_markup)
+
+        except TypeError:
+            update.message.reply_text('Я тебя не понял 😔 \nНажми на кнопку 👇', reply_markup=reply_markup)
+
 
 
 def send_err(update: Update, context: CallbackContext) -> None:
