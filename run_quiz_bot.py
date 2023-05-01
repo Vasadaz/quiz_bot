@@ -3,18 +3,44 @@ import logging
 import random
 import time
 
+from enum import Enum
+
 from environs import Env
 from pathlib import Path
-from telegram import Bot, ReplyKeyboardMarkup, Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
-
+from telegram import Bot, ReplyKeyboardMarkup, Update, ReplyKeyboardRemove
+from telegram.ext import (
+    Updater,
+    CommandHandler,
+    MessageHandler,
+    Filters,
+    CallbackContext,
+    ConversationHandler,
+)
 import redis_db
 
 from bot_logger import BotLogsHandler
 
 
-
 logger = logging.getLogger(__file__)
+
+class Step(Enum):
+    QUESTION = 1
+    ANSWER = 2
+    BAD_ANSWER = 3
+    SURRENDER = 4
+    RESULT = 5
+    TRASH = 6
+
+
+def cancel(update: Update, context: CallbackContext) -> ConversationHandler.END:
+    db.delete(update.message.chat.id)
+
+    update.message.reply_text(
+        'Пока! Будет скучно - пиши 😏',
+        reply_markup=new_question_reply_markup,
+    )
+
+    return ConversationHandler.END
 
 
 def get_questions() -> dict[str:dict[str:str]]:
@@ -24,53 +50,84 @@ def get_questions() -> dict[str:dict[str:str]]:
 
     return questions
 
-def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text(
-        f'{update.effective_user.full_name}, будем знакомы - я Бот Ботыч 😍 \nДавай сыграем в викторину?!',
-        reply_markup=reply_markup,
-    )
+
+def handle_get_my_score(
+        update: Update,
+        context: CallbackContext,
+        step: Step,
+        reply_markup: ReplyKeyboardMarkup,
+):
+    update.message.reply_text('Тест - Мой счёт', reply_markup=reply_markup)
+    return step
 
 
-def send_msg(update: Update, context: CallbackContext) -> None:
-    if update.message.text == 'Новый вопрос':
-        questions = get_questions()
+def handle_new_question(update: Update, context: CallbackContext) -> Step:
+    if update.message.text == 'Мой счёт':
+        return handle_get_my_score(
+            update=update,
+            context=context,
+            step=Step.QUESTION,
+            reply_markup=new_question_reply_markup,
+        )
+
+    questions = get_questions()
+    random_num = random.randrange(1, len(questions))
+    question = questions[str(random_num)].get('Вопрос', '')
+
+    while not question:
         random_num = random.randrange(1, len(questions))
         question = questions[str(random_num)].get('Вопрос', '')
 
-        while not question:
-            random_num = random.randrange(1, len(questions))
-            question = questions[str(random_num)].get('Вопрос', '')
+    update.message.reply_text(question, reply_markup=answer_reply_markup)
+    db.set(update.message.chat.id, str(questions[str(random_num)]))
 
-        update.message.reply_text(question , reply_markup=reply_markup)
-        db.set(update.message.chat.id, str(questions[str(random_num)]))
+    return Step.ANSWER
 
-    elif update.message.text == 'Мой счёт':
-        update.message.reply_text('Тест - Мой счёт', reply_markup=reply_markup)
+
+def handle_answer(update: Update, context: CallbackContext) -> Step:
+    if update.message.text == 'Мой счёт':
+        return handle_get_my_score(
+            update=update,
+            context=context,
+            step=Step.ANSWER,
+            reply_markup=answer_reply_markup,
+        )
+
+    question_notes = eval(db.get(update.message.chat.id))
+    answer_notes = '\n'.join(f'{key}: {value}' for key, value in question_notes.items() if key != 'Вопрос')
+    user_answer = update.message.text.lower().strip(' .,:"').replace('ё', 'е')
+    correct_answer = question_notes['Ответ'].lower().strip(' .,:"').replace('ё', 'е')
+    step = Step.QUESTION
+    reply_markup = new_question_reply_markup
+
+    if user_answer == correct_answer:
+        answer = f'Урааа! Совершенной верно 👌\n' \
+                 f'➕1️⃣ балл\n' \
+                 f'Вот что у меня есть по вопросу 👇\n\n' + answer_notes
+        db.delete(update.message.chat.id)
+
+    elif update.message.text == 'Сдаться':
+        answer = 'Бывает...\n' \
+                 'Вот что у меня есть по вопросу 👇\n\n' + answer_notes
+        db.delete(update.message.chat.id)
 
     else:
-        try:
-            question_notes = eval(db.get(update.message.chat.id))
-            answer_notes = '\n'.join(f'{key}: {value}' for key, value in question_notes.items() if key != 'Вопрос')
+        step = Step.ANSWER
+        reply_markup = answer_reply_markup
+        answer = 'Ответ неверный 😔\nПодумай ещё 🤔'
 
-            if update.message.text == 'Сдаться':
-                answer = 'Бывает...\n' \
-                         'Вот что у меня есть по вопросу 👇\n\n' + answer_notes
-                db.delete(update.message.chat.id)
+    update.message.reply_text(answer, reply_markup=reply_markup)
 
-            elif (update.message.text.lower().strip(' .,:"')) == question_notes['Ответ'].lower().strip(' .,:"'):
-                answer = f'Урааа! Совершенной верно 👌\n' \
-                         f'➕1️⃣ балл\n' \
-                         f'Вот что у меня есть по вопросу 👇\n\n' + answer_notes
-                db.delete(update.message.chat.id)
+    return step
 
-            else:
-                answer = 'Ответ неверный 😔\nПодумай ещё 🤔'
 
-            update.message.reply_text(answer, reply_markup=reply_markup)
+def start(update: Update, context: CallbackContext) -> Step:
+    update.message.reply_text(
+        f'{update.effective_user.full_name}, будем знакомы - я Бот Ботыч 😍 \nДавай сыграем в викторину?!',
+        reply_markup=new_question_reply_markup,
+    )
 
-        except TypeError:
-            update.message.reply_text('Я тебя не понял 😔 \nНажми на кнопку 👇', reply_markup=reply_markup)
-
+    return Step.QUESTION
 
 
 def send_err(update: Update, context: CallbackContext) -> None:
@@ -97,9 +154,7 @@ if __name__ == '__main__':
 
     bot = Bot(tg_token)
     tg_bot_name = f'@{bot.get_me().username}'
-    custom_keyboard = [['Новый вопрос', 'Сдаться'],
-                       ['Мой счёт']]
-    reply_markup = ReplyKeyboardMarkup(custom_keyboard)
+
 
     if not admin_tg_token:
         admin_tg_token = tg_token
@@ -112,14 +167,34 @@ if __name__ == '__main__':
 
     logger.info('Start Telegram bot.')
 
+    new_question_reply_markup = ReplyKeyboardMarkup(
+        [['Новый вопрос'],
+         ['Мой счёт']]
+    )
+
+    answer_reply_markup = ReplyKeyboardMarkup(
+        [['Сдаться'],
+         ['Мой счёт']]
+    )
+
+
+
     while True:
         try:
             updater = Updater(tg_token)
-
             dispatcher = updater.dispatcher
+
+            conv_handler = ConversationHandler(
+                entry_points=[CommandHandler('start', start)],
+                states={
+                    Step.QUESTION: [MessageHandler(Filters.regex('Новый вопрос|Мой счёт'), handle_new_question)],
+                    Step.ANSWER: [MessageHandler(Filters.text, handle_answer)],
+                },
+                fallbacks=[CommandHandler('cancel', cancel)],
+            )
+
             dispatcher.add_error_handler(send_err)
-            dispatcher.add_handler(CommandHandler('start', start))
-            dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, send_msg))
+            dispatcher.add_handler(conv_handler)
 
             db = redis_db.connect(
                 host=db_host,
