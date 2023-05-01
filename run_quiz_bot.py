@@ -26,8 +26,7 @@ logger = logging.getLogger(__file__)
 class Step(Enum):
     QUESTION = 1
     ANSWER = 2
-    BAD_ANSWER = 3
-    SURRENDER = 4
+    SURRENDER = 3
     RESULT = 5
     TRASH = 6
 
@@ -59,6 +58,17 @@ def handle_get_my_score(
 ):
     update.message.reply_text('Тест - Мой счёт', reply_markup=reply_markup)
     return step
+
+def handle_surrender(
+        update: Update,
+        context: CallbackContext,
+        answer_notes: str,
+):
+    answer = 'Бывает...\n' \
+             'Вот что у меня есть по вопросу 👇\n\n' + answer_notes
+    update.message.reply_text(answer)
+    update.message.reply_text('Лови новый вопрос 👇')
+    return handle_new_question(update, context)
 
 
 def handle_new_question(update: Update, context: CallbackContext) -> Step:
@@ -101,15 +111,14 @@ def handle_answer(update: Update, context: CallbackContext) -> Step:
     reply_markup = new_question_reply_markup
 
     if user_answer == correct_answer:
+        db.delete(update.message.chat.id)
         answer = f'Урааа! Совершенной верно 👌\n' \
                  f'➕1️⃣ балл\n' \
                  f'Вот что у меня есть по вопросу 👇\n\n' + answer_notes
-        db.delete(update.message.chat.id)
 
     elif update.message.text == 'Сдаться':
-        answer = 'Бывает...\n' \
-                 'Вот что у меня есть по вопросу 👇\n\n' + answer_notes
         db.delete(update.message.chat.id)
+        return handle_surrender(update, context, answer_notes)
 
     else:
         step = Step.ANSWER
