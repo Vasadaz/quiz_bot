@@ -6,14 +6,12 @@ from enum import Enum
 from environs import Env
 from telegram import Bot, ReplyKeyboardMarkup, Update
 from telegram.ext import (
-    Updater,
+    CallbackContext,
     CommandHandler,
     ConversationHandler,
     Filters,
     MessageHandler,
-    Filters,
-    CallbackContext,
-    ConversationHandler,
+    Updater,
 )
 
 import quizzes_parser
@@ -25,11 +23,9 @@ from bot_logger import BotLogsHandler
 logger = logging.getLogger(__file__)
 
 class Step(Enum):
-    QUESTION = 1
-    ANSWER = 2
-    SURRENDER = 3
-    RESULT = 5
-    TRASH = 6
+    ANSWER = 1
+    QUESTION = 2
+
 
 
 def cancel(update: Update, context: CallbackContext) -> ConversationHandler.END:
@@ -181,8 +177,8 @@ if __name__ == '__main__':
             conv_handler = ConversationHandler(
                 entry_points=[CommandHandler('start', start)],
                 states={
-                    Step.QUESTION: [MessageHandler(Filters.regex('Новый вопрос|Мой счёт'), handle_new_question)],
                     Step.ANSWER: [MessageHandler(Filters.text, handle_answer)],
+                    Step.QUESTION: [MessageHandler(Filters.regex('Новый вопрос|Мой счёт'), handle_new_question)],
                 },
                 fallbacks=[CommandHandler('cancel', cancel)],
             )
