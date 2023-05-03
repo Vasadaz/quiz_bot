@@ -190,7 +190,10 @@ if __name__ == '__main__':
             dispatcher = updater.dispatcher
 
             conv_handler = ConversationHandler(
-                entry_points=[CommandHandler('start', start)],
+                entry_points=[
+                    CommandHandler('start', start),
+                    MessageHandler(Filters.text, handle_answer),
+                ],
                 states={
                     Step.ANSWER: [MessageHandler(Filters.text, handle_answer)],
                     Step.QUESTION: [MessageHandler(Filters.regex('Новый вопрос|Мой счёт'), handle_new_question)],
