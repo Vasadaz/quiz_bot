@@ -36,7 +36,7 @@ def cancel(update: Update, context: CallbackContext) -> ConversationHandler.END:
 
     update.message.reply_text(
         'Пока! Будет скучно - пиши 😏',
-        reply_markup=new_question_reply_markup,
+        reply_markup=new_question_keyboard,
     )
 
     return ConversationHandler.END
@@ -77,7 +77,7 @@ def handle_new_question(update: Update, context: CallbackContext) -> Step:
             update=update,
             context=context,
             step=Step.QUESTION,
-            reply_markup=new_question_reply_markup,
+            reply_markup=new_question_keyboard,
         )
 
     questions = get_questions()
@@ -88,7 +88,7 @@ def handle_new_question(update: Update, context: CallbackContext) -> Step:
         random_num = random.randrange(1, len(questions))
         question = questions[str(random_num)].get('Вопрос', '')
 
-    update.message.reply_text(question, reply_markup=answer_reply_markup)
+    update.message.reply_text(question, reply_markup=answer_keyboard)
     db.set(update.message.chat.id, str(questions[str(random_num)]))
 
     return Step.ANSWER
@@ -100,7 +100,7 @@ def handle_answer(update: Update, context: CallbackContext) -> Step:
             update=update,
             context=context,
             step=Step.ANSWER,
-            reply_markup=answer_reply_markup,
+            reply_markup=answer_keyboard,
         )
 
     question_notes = eval(db.get(update.message.chat.id))
@@ -108,7 +108,7 @@ def handle_answer(update: Update, context: CallbackContext) -> Step:
     user_answer = update.message.text.lower().strip(' .,:"').replace('ё', 'е')
     correct_answer = question_notes['Ответ'].lower().strip(' .,:"').replace('ё', 'е')
     step = Step.QUESTION
-    reply_markup = new_question_reply_markup
+    reply_markup = new_question_keyboard
 
     if user_answer == correct_answer:
         db.delete(update.message.chat.id)
@@ -122,7 +122,7 @@ def handle_answer(update: Update, context: CallbackContext) -> Step:
 
     else:
         step = Step.ANSWER
-        reply_markup = answer_reply_markup
+        reply_markup = answer_keyboard
         answer = 'Ответ неверный 😔\nПодумай ещё 🤔'
 
     update.message.reply_text(answer, reply_markup=reply_markup)
@@ -133,7 +133,7 @@ def handle_answer(update: Update, context: CallbackContext) -> Step:
 def start(update: Update, context: CallbackContext) -> Step:
     update.message.reply_text(
         f'{update.effective_user.full_name}, будем знакомы - я Бот Ботыч 😍 \nДавай сыграем в викторину?!',
-        reply_markup=new_question_reply_markup,
+        reply_markup=new_question_keyboard,
     )
 
     return Step.QUESTION
@@ -176,17 +176,15 @@ if __name__ == '__main__':
 
     logger.info('Start Telegram bot.')
 
-    new_question_reply_markup = ReplyKeyboardMarkup(
+    new_question_keyboard = ReplyKeyboardMarkup(
         [['Новый вопрос'],
          ['Мой счёт']]
     )
 
-    answer_reply_markup = ReplyKeyboardMarkup(
+    answer_keyboard = ReplyKeyboardMarkup(
         [['Сдаться'],
          ['Мой счёт']]
     )
-
-
 
     while True:
         try:
