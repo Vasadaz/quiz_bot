@@ -1,21 +1,22 @@
-import json
 import logging
-import random
 import time
 
 from enum import Enum
 
 from environs import Env
-from pathlib import Path
-from telegram import Bot, ReplyKeyboardMarkup, Update, ReplyKeyboardRemove
+from telegram import Bot, ReplyKeyboardMarkup, Update
 from telegram.ext import (
     Updater,
     CommandHandler,
+    ConversationHandler,
+    Filters,
     MessageHandler,
     Filters,
     CallbackContext,
     ConversationHandler,
 )
+
+import quizzes_parser
 import redis_db
 
 from bot_logger import BotLogsHandler
@@ -40,14 +41,6 @@ def cancel(update: Update, context: CallbackContext) -> ConversationHandler.END:
     )
 
     return ConversationHandler.END
-
-
-def get_questions() -> dict[str:dict[str:str]]:
-    quizzes_path = Path('quiz-questions/quizzes_parser')
-    random_quizzes_file_path = random.choice([*quizzes_path.iterdir()])
-    questions = json.loads(random_quizzes_file_path.read_text(encoding='UTF-8'))
-
-    return questions
 
 
 def handle_get_my_score(
@@ -80,16 +73,10 @@ def handle_new_question(update: Update, context: CallbackContext) -> Step:
             reply_markup=new_question_keyboard,
         )
 
-    questions = get_questions()
-    random_num = random.randrange(1, len(questions))
-    question = questions[str(random_num)].get('Вопрос', '')
+    question_notes = quizzes_parser.get_question_notes()
 
-    while not question:
-        random_num = random.randrange(1, len(questions))
-        question = questions[str(random_num)].get('Вопрос', '')
-
-    update.message.reply_text(question, reply_markup=answer_keyboard)
-    db.set(update.message.chat.id, str(questions[str(random_num)]))
+    update.message.reply_text(question_notes['Вопрос'], reply_markup=answer_keyboard)
+    db.set(update.message.chat.id, str(question_notes))
 
     return Step.ANSWER
 

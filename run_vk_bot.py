@@ -1,9 +1,6 @@
-import json
 import logging
 import random
 import time
-
-from pathlib import Path
 
 import vk_api as vk
 
@@ -12,20 +9,13 @@ from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.longpoll import Event as VkEvent, VkEventType, VkLongPoll
 from vk_api.vk_api import VkApiMethod
 
+import quizzes_parser
 import redis_db
 
 from bot_logger import BotLogsHandler
 
 
 logger = logging.getLogger(__name__)
-
-
-def get_questions() -> dict[str:dict[str:str]]:
-    quizzes_path = Path('quiz-questions/quizzes_parser')
-    random_quizzes_file_path = random.choice([*quizzes_path.iterdir()])
-    questions = json.loads(random_quizzes_file_path.read_text(encoding='UTF-8'))
-
-    return questions
 
 
 def handle_answer(event: VkEvent, vk_api: VkApiMethod):
@@ -97,22 +87,16 @@ def handle_new_question(event: VkEvent, vk_api: VkApiMethod):
             keyboard=new_question_keyboard.get_keyboard()
         )
 
-    questions = get_questions()
-    random_num = random.randrange(1, len(questions))
-    question = questions[str(random_num)].get('Вопрос', '')
-
-    while not question:
-        random_num = random.randrange(1, len(questions))
-        question = questions[str(random_num)].get('Вопрос', '')
+    question_notes = quizzes_parser.get_question_notes()
 
     vk_api.messages.send(
         user_id=event.user_id,
-        message=question,
+        message=question_notes['Вопрос'],
         keyboard=answer_keyboard.get_keyboard(),
         random_id=random.randint(1, 1000),
     )
 
-    db.set(event.user_id, str(questions[str(random_num)]))
+    db.set(event.user_id, str(question_notes))
 
 
 def handle_surrender(event: VkEvent, vk_api: VkApiMethod, answer_notes: str):

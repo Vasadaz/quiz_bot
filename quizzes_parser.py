@@ -1,8 +1,21 @@
 import json
+import random
 import re
 import traceback
 
 from pathlib import Path
+
+
+def get_question_notes() -> dict[str:str]:
+    quizzes_path = Path('quiz-questions/quizzes_parser')
+    random_quizzes_file_path = random.choice([*quizzes_path.iterdir()])
+    questions = json.loads(random_quizzes_file_path.read_text(encoding='UTF-8'))
+    random_num = random.randrange(1, len(questions))
+
+    while not questions[str(random_num)].get('Вопрос', ''):
+        random_num = random.randrange(1, len(questions))
+
+    return questions[str(random_num)]
 
 
 def parse_questions(text: str) -> list[str]:
