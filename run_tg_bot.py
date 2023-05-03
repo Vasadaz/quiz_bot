@@ -78,39 +78,54 @@ def handle_new_question(update: Update, context: CallbackContext) -> Step:
 
 
 def handle_answer(update: Update, context: CallbackContext) -> Step:
-    if update.message.text == 'Мой счёт':
-        return handle_get_my_score(
-            update=update,
-            context=context,
-            step=Step.ANSWER,
-            reply_markup=answer_keyboard,
-        )
+    try:
+        keyboard = answer_keyboard
+        question_notes = eval(db.get(update.message.chat.id))
 
-    question_notes = eval(db.get(update.message.chat.id))
-    answer_notes = '\n'.join(f'{key}: {value}' for key, value in question_notes.items() if key != 'Вопрос')
-    user_answer = update.message.text.lower().strip(' .,:"').replace('ё', 'е')
-    correct_answer = question_notes['Ответ'].lower().strip(' .,:"').replace('ё', 'е')
-    step = Step.QUESTION
-    reply_markup = new_question_keyboard
+        if update.message.text == 'Мой счёт':
+            return handle_get_my_score(
+                update=update,
+                context=context,
+                step=Step.ANSWER,
+                reply_markup=keyboard,
+            )
 
-    if user_answer == correct_answer:
-        db.delete(update.message.chat.id)
-        answer = f'Урааа! Совершенной верно 👌\n' \
-                 f'➕1️⃣ балл\n' \
-                 f'Вот что у меня есть по вопросу 👇\n\n' + answer_notes
+        answer_notes = '\n'.join(f'{key}: {value}' for key, value in question_notes.items() if key != 'Вопрос')
+        user_answer = update.message.text.lower().strip(' .,:"').replace('ё', 'е')
+        correct_answer = question_notes['Ответ'].lower().strip(' .,:"').replace('ё', 'е')
+        step = Step.QUESTION
 
-    elif update.message.text == 'Сдаться':
-        db.delete(update.message.chat.id)
-        return handle_surrender(update, context, answer_notes)
+        if user_answer == correct_answer:
+            db.delete(update.message.chat.id)
+            keyboard = new_question_keyboard
+            answer = f'Урааа! Совершенной верно 👌\n' \
+                     f'➕1️⃣ балл\n' \
+                     f'Вот что у меня есть по вопросу 👇\n\n' + answer_notes
 
-    else:
-        step = Step.ANSWER
-        reply_markup = answer_keyboard
-        answer = 'Ответ неверный 😔\nПодумай ещё 🤔'
+        elif update.message.text == 'Сдаться':
+            db.delete(update.message.chat.id)
+            return handle_surrender(update, context, answer_notes)
 
-    update.message.reply_text(answer, reply_markup=reply_markup)
+        else:
+            step = Step.ANSWER
+            answer = 'Ответ неверный 😔\nПодумай ещё 🤔'
 
-    return step
+        update.message.reply_text(answer, reply_markup=keyboard)
+
+        return step
+
+    except TypeError:
+        keyboard = new_question_keyboard
+
+        if update.message.text == 'Мой счёт':
+            return handle_get_my_score(
+                update=update,
+                context=context,
+                step=Step.QUESTION,
+                reply_markup=keyboard,
+            )
+
+        update.message.reply_text('Я тебя не понял... Нажми нужную кнопку 👇', reply_markup=keyboard)
 
 
 def start(update: Update, context: CallbackContext) -> Step:
