@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def get_question_notes() -> dict[str:str]:
-    quizzes_path = Path('quiz-questions/quizzes_parser')
+    quizzes_path = Path('quizzes/quizzes_parser')
     random_quizzes_file_path = random.choice([*quizzes_path.iterdir()])
     questions = json.loads(random_quizzes_file_path.read_text(encoding='UTF-8'))
     random_num = random.randrange(1, len(questions))
@@ -86,7 +86,7 @@ def sterilize_questions(questions: list) -> dict[int:dict[str:str]]:
 
 
 if __name__ == '__main__':
-    quizzes_folder_path = Path('quiz-questions')
+    quizzes_folder_path = Path('quizzes')
     parser_folder_path = quizzes_folder_path / 'quizzes_parser'
     parser_folder_path.mkdir(exist_ok=True)
 
