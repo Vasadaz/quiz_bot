@@ -21,7 +21,7 @@
 
 1. Клонировать репозиторий:
     ```shell
-    git clone git@github.com:Vasadaz/quiz_bot.git
+    git clone https://github.com/vasadaz/devman_bot.git
     ```
 
 
