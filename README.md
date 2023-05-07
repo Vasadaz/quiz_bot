@@ -8,7 +8,7 @@
 
    - [Бот Telegram](https://t.me/DevmanLessonsBot)
 
-     ![tg.gif](docs/Ftg.gif)
+     ![tg.gif](docs/tg.gif)
 
 
    - [Бот VK](https://vk.com/club219388423)
