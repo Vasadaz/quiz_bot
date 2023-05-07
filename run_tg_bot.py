@@ -22,21 +22,24 @@ from bot_logger import BotLogsHandler
 
 logger = logging.getLogger(__file__)
 
+
 class Step(Enum):
     ANSWER = 1
     QUESTION = 2
 
 
-
 def cancel(update: Update, context: CallbackContext) -> ConversationHandler.END:
-    db.delete(update.message.chat.id)
+    try:
+        db.delete(update.message.chat.id)
+    except TypeError:
+        pass
 
     update.message.reply_text(
         'Пока! Будет скучно - пиши 😏',
         reply_markup=new_question_keyboard,
     )
 
-    return ConversationHandler.END
+    return Step.QUESTION
 
 
 def handle_get_my_score(
@@ -46,7 +49,9 @@ def handle_get_my_score(
         reply_markup: ReplyKeyboardMarkup,
 ):
     update.message.reply_text('Тест - Мой счёт', reply_markup=reply_markup)
+
     return step
+
 
 def handle_surrender(
         update: Update,
@@ -57,6 +62,7 @@ def handle_surrender(
              'Вот что у меня есть по вопросу 👇\n\n' + answer_notes
     update.message.reply_text(answer)
     update.message.reply_text('Лови новый вопрос 👇')
+
     return handle_new_question(update, context)
 
 
@@ -129,6 +135,11 @@ def handle_answer(update: Update, context: CallbackContext) -> Step:
 
 
 def start(update: Update, context: CallbackContext) -> Step:
+    try:
+        db.delete(update.message.chat.id)
+    except TypeError:
+        pass
+
     update.message.reply_text(
         f'{update.effective_user.full_name}, будем знакомы - я Бот Ботыч 😍 \nДавай сыграем в викторину?!',
         reply_markup=new_question_keyboard,
@@ -192,11 +203,20 @@ if __name__ == '__main__':
             conv_handler = ConversationHandler(
                 entry_points=[
                     CommandHandler('start', start),
+                    CommandHandler('cancel', cancel),
                     MessageHandler(Filters.text, handle_answer),
                 ],
                 states={
-                    Step.ANSWER: [MessageHandler(Filters.text, handle_answer)],
-                    Step.QUESTION: [MessageHandler(Filters.regex('Новый вопрос|Мой счёт'), handle_new_question)],
+                    Step.ANSWER: [
+                        CommandHandler('start', start),
+                        CommandHandler('cancel', cancel),
+                        MessageHandler(Filters.text, handle_answer),
+                    ],
+                    Step.QUESTION: [
+                        CommandHandler('start', start),
+                        CommandHandler('cancel', cancel),
+                        MessageHandler(Filters.regex('Новый вопрос|Мой счёт'), handle_new_question)
+                    ],
                 },
                 fallbacks=[CommandHandler('cancel', cancel)],
             )
