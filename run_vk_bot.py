@@ -2,6 +2,7 @@ import logging
 import random
 import time
 
+import redis
 import vk_api as vk
 
 from environs import Env
@@ -10,7 +11,6 @@ from vk_api.longpoll import Event as VkEvent, VkEventType, VkLongPoll
 from vk_api.vk_api import VkApiMethod
 
 import quizzes_parser
-import redis_db
 
 from bot_logger import BotLogsHandler
 
@@ -153,10 +153,12 @@ if __name__ == '__main__':
             vk_api = vk_session.get_api()
             longpoll = VkLongPoll(vk_session)
 
-            db = redis_db.connect(
+            db = redis.StrictRedis(
                 host=db_host,
                 port=db_port,
                 password=db_password,
+                charset='utf-8',
+                decode_responses=True,
             )
 
             for event in longpoll.listen():

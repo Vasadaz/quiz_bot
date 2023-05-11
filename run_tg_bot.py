@@ -3,6 +3,8 @@ import time
 
 from enum import Enum
 
+import redis
+
 from environs import Env
 from telegram import Bot, ReplyKeyboardMarkup, Update
 from telegram.ext import (
@@ -15,7 +17,6 @@ from telegram.ext import (
 )
 
 import quizzes_parser
-import redis_db
 
 from bot_logger import BotLogsHandler
 
@@ -224,10 +225,12 @@ if __name__ == '__main__':
             dispatcher.add_error_handler(send_err)
             dispatcher.add_handler(conv_handler)
 
-            db = redis_db.connect(
+            db = redis.StrictRedis(
                 host=db_host,
                 port=db_port,
                 password=db_password,
+                charset='utf-8',
+                decode_responses=True,
             )
 
             updater.start_polling()
