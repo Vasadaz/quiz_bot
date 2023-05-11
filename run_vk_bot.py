@@ -2,6 +2,8 @@ import logging
 import random
 import time
 
+from textwrap import dedent
+
 import redis
 import vk_api as vk
 
@@ -37,9 +39,12 @@ def handle_answer(event: VkEvent, vk_api: VkApiMethod):
         if user_answer == correct_answer:
             db.delete(event.user_id)
             keyboard = new_question_keyboard.get_keyboard()
-            answer = f'Урааа! Совершенной верно 👌\n' \
-                     f'➕1️⃣ балл\n' \
-                     f'Вот что у меня есть по вопросу 👇\n\n' + answer_notes
+            answer = dedent(f'''\
+                Урааа! Совершенной верно 👌
+                ➕1️⃣ балл
+                Вот что у меня есть по вопросу 👇
+                
+            ''') + answer_notes
 
         elif event.text == 'Мой счёт':
             answer = 'Тест - Мой Счёт'
@@ -49,7 +54,7 @@ def handle_answer(event: VkEvent, vk_api: VkApiMethod):
 
         vk_api.messages.send(
             user_id=event.user_id,
-            message=answer,
+            message=dedent(answer),
             keyboard=keyboard,
             random_id=random.randint(1, 1000),
         )
@@ -65,7 +70,7 @@ def handle_answer(event: VkEvent, vk_api: VkApiMethod):
 
         vk_api.messages.send(
             user_id=event.user_id,
-            message='Я тебя не понял... Нажми нужную кнопку 👇',
+            message='Я тебя не понял...\nНажми нужную кнопку 👇',
             keyboard=keyboard,
             random_id=random.randint(1, 1000),
         )
@@ -100,18 +105,24 @@ def handle_new_question(event: VkEvent, vk_api: VkApiMethod):
 
 
 def handle_surrender(event: VkEvent, vk_api: VkApiMethod, answer_notes: str):
-    answer = 'Бывает...\n' \
-             'Вот что у меня есть по вопросу 👇\n\n' + answer_notes
+    answer = dedent('''\
+        Бывает...
+        Вот что у меня есть по вопросу 👇
+        
+    ''') + answer_notes
+
     vk_api.messages.send(
         user_id=event.user_id,
         message=answer,
         random_id=random.randint(1, 1000),
     )
+
     vk_api.messages.send(
         user_id=event.user_id,
         message='Лови новый вопрос 👇',
         random_id=random.randint(1, 1000),
     )
+
     return handle_new_question(event=event, vk_api=vk_api)
 
 

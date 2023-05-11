@@ -2,6 +2,7 @@ import logging
 import time
 
 from enum import Enum
+from textwrap import dedent
 
 import redis
 
@@ -59,8 +60,12 @@ def handle_surrender(
         context: CallbackContext,
         answer_notes: str,
 ):
-    answer = 'Бывает...\n' \
-             'Вот что у меня есть по вопросу 👇\n\n' + answer_notes
+    answer = dedent('''
+        Бывает...
+        Вот что у меня есть по вопросу 👇
+        
+    ''') + answer_notes
+
     update.message.reply_text(answer)
     update.message.reply_text('Лови новый вопрос 👇')
 
@@ -105,9 +110,12 @@ def handle_answer(update: Update, context: CallbackContext) -> Step:
         if user_answer == correct_answer:
             db.delete(update.message.chat.id)
             keyboard = new_question_keyboard
-            answer = f'Урааа! Совершенной верно 👌\n' \
-                     f'➕1️⃣ балл\n' \
-                     f'Вот что у меня есть по вопросу 👇\n\n' + answer_notes
+            answer = dedent('''\
+                Урааа! Совершенной верно 👌
+                ➕1️⃣ балл
+                Вот что у меня есть по вопросу 👇
+                
+            ''') + answer_notes
 
         elif update.message.text == 'Сдаться':
             db.delete(update.message.chat.id)
@@ -117,7 +125,7 @@ def handle_answer(update: Update, context: CallbackContext) -> Step:
             step = Step.ANSWER
             answer = 'Ответ неверный 😔\nПодумай ещё 🤔'
 
-        update.message.reply_text(answer, reply_markup=keyboard)
+        update.message.reply_text(dedent(answer), reply_markup=keyboard)
 
         return step
 
@@ -132,7 +140,7 @@ def handle_answer(update: Update, context: CallbackContext) -> Step:
                 reply_markup=keyboard,
             )
 
-        update.message.reply_text('Я тебя не понял... Нажми нужную кнопку 👇', reply_markup=keyboard)
+        update.message.reply_text('Я тебя не понял...\nНажми нужную кнопку 👇', reply_markup=keyboard)
 
 
 def start(update: Update, context: CallbackContext) -> Step:
@@ -142,7 +150,10 @@ def start(update: Update, context: CallbackContext) -> Step:
         pass
 
     update.message.reply_text(
-        f'{update.effective_user.full_name}, будем знакомы - я Бот Ботыч 😍 \nДавай сыграем в викторину?!',
+        dedent(f'''\
+            {update.effective_user.full_name}, будем знакомы - я Бот Ботыч 😍
+            Давай сыграем в викторину?!
+        '''),
         reply_markup=new_question_keyboard,
     )
 
