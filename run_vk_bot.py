@@ -1,3 +1,4 @@
+import json
 import logging
 import random
 import time
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 def handle_answer(event: VkEvent, vk_api: VkApiMethod):
     try:
         keyboard = answer_keyboard.get_keyboard()
-        question_notes = eval(db.get(event.user_id))
+        question_notes = json.loads(db.get(event.user_id))
 
         if event.text == 'Мой счёт':
             return handle_get_my_score(event=event, vk_api=vk_api, keyboard=keyboard)
@@ -101,7 +102,7 @@ def handle_new_question(event: VkEvent, vk_api: VkApiMethod):
         random_id=random.randint(1, 1000),
     )
 
-    db.set(event.user_id, str(question_notes))
+    db.set(event.user_id, json.dumps(question_notes))
 
 
 def handle_surrender(event: VkEvent, vk_api: VkApiMethod, answer_notes: str):

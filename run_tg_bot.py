@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 
@@ -84,7 +85,7 @@ def handle_new_question(update: Update, context: CallbackContext) -> Step:
     question_notes = quizzes_parser.get_question_notes()
 
     update.message.reply_text(question_notes['Вопрос'], reply_markup=answer_keyboard)
-    db.set(update.message.chat.id, str(question_notes))
+    db.set(update.message.chat.id, json.dumps(question_notes))
 
     return Step.ANSWER
 
@@ -92,7 +93,7 @@ def handle_new_question(update: Update, context: CallbackContext) -> Step:
 def handle_answer(update: Update, context: CallbackContext) -> Step:
     try:
         keyboard = answer_keyboard
-        question_notes = eval(db.get(update.message.chat.id))
+        question_notes = json.loads(db.get(update.message.chat.id))
 
         if update.message.text == 'Мой счёт':
             return handle_get_my_score(
