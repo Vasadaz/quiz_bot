@@ -18,16 +18,16 @@ def get_question_notes() -> dict[str:str]:
     return questions[str(random_num)]
 
 
-def parse_questions(text: str) -> list[str]:
-    questions = []
+def parse_questions(text: str) -> dict[int:dict[str:str]]:
+    questions = {}
 
-    for note in re.split('\nВопрос \d+', text):
-        if note[0] == ':':
-            questions.append('Вопрос' + note.strip())
-        else:
-            questions.append(note.strip())
+    for num, question in enumerate(re.split('\nВопрос \d+', text), start=0):
+        if question[0] == ':':
+            question = 'Вопрос' + question
 
-    return sterilize_questions(questions)
+        questions[num] = parse_question_notes(question.strip(), num)
+
+    return questions
 
 
 def parse_question_notes(question: str, num: int) -> dict[str:str]:
@@ -35,54 +35,19 @@ def parse_question_notes(question: str, num: int) -> dict[str:str]:
     error_str_limit = 1000
 
     for notes in question.strip().split('\n\n'):
-        if notes:
-            try:
-                notes = notes.split(':\n', maxsplit=1)
-                if '.jpg' not in notes[1]:
-                    question_notes[notes[0]] = notes[1].strip()
-                else:
-                    raise ValueError
+        notes = notes.split(':\n', maxsplit=1)
 
-            except IndexError:
-                question_notes = {
-                    f'ERROR': {
-                        'question': question[:error_str_limit],
-                        'crash_str': notes[0][:error_str_limit],
-                        'traceback': traceback.format_exc(),
-                    }
-                }
+        if len(notes) > 1 and '.jpg' not in notes[1]:
+            question_notes[notes[0]] = notes[1].strip()
 
-                if not quizzes_errors.get(quiz_file.name):
-                     quizzes_errors[quiz_file.name] = {}
+        else:
+            if not quizzes_errors.get(quiz_file.name):
+                quizzes_errors[quiz_file.name] = {}
 
-                quizzes_errors[quiz_file.name][f'ERROR in question №{num}'] = question_notes['ERROR']
-
-                return question_notes
-
-            except ValueError:
-                question_notes = {
-                    f'ERROR': {
-                        'question': question[:error_str_limit],
-                        'crash_str': notes[1][:error_str_limit],
-                        'traceback': traceback.format_exc(),
-                    }
-                }
-
-                if not quizzes_errors.get(quiz_file.name):
-                     quizzes_errors[quiz_file.name] = {}
-
-                quizzes_errors[quiz_file.name][f'ERROR in question №{num}'] = question_notes['ERROR']
-
-                return question_notes
+            question_notes = {f'ERROR': question[:error_str_limit]}
+            quizzes_errors[quiz_file.name][f'ERROR in question №{num}'] = question_notes['ERROR']
 
     return question_notes
-
-
-def sterilize_questions(questions: list) -> dict[int:dict[str:str]]:
-    sterilized_questions = {}
-    for num, question in enumerate(questions, start=0):
-        sterilized_questions[num] = parse_question_notes(question, num)
-    return sterilized_questions
 
 
 if __name__ == '__main__':
