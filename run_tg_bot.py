@@ -45,21 +45,21 @@ def cancel(update: Update, context: CallbackContext) -> ConversationHandler.END:
     return Step.QUESTION
 
 
-def handle_get_my_score(
-        update: Update,
-        context: CallbackContext,
-        step: Step,
-        reply_markup: ReplyKeyboardMarkup,
-):
-    update.message.reply_text('Тест - Мой счёт', reply_markup=reply_markup)
+def handle_get_my_score(update: Update, context: CallbackContext):
+    conversations_step = conv_handler.conversations.get((update.message.chat.id, update.message.chat.id))
 
-    return step
+    if conversations_step is Step.ANSWER:
+        keyboard = answer_keyboard
+    else:
+        keyboard = new_question_keyboard
+    update.message.reply_text(f'ТЕСТ {conversations_step} - Мой счёт', reply_markup=keyboard)
+
 
 
 def handle_surrender(
-        update: Update,
-        context: CallbackContext,
-        answer_notes: str,
+    update: Update,
+    context: CallbackContext,
+    answer_notes: str,
 ):
     answer = dedent('''
         Бывает...
@@ -74,17 +74,10 @@ def handle_surrender(
 
 
 def handle_new_question(update: Update, context: CallbackContext) -> Step:
-    if update.message.text == 'Мой счёт':
-        return handle_get_my_score(
-            update=update,
-            context=context,
-            step=Step.QUESTION,
-            reply_markup=new_question_keyboard,
-        )
-
     question_notes = quizzes_parser.get_question_notes()
 
     update.message.reply_text(question_notes['Вопрос'], reply_markup=answer_keyboard)
+    update.message.reply_text(question_notes['Ответ'], reply_markup=answer_keyboard)
     db.set(update.message.chat.id, json.dumps(question_notes))
 
     return Step.ANSWER
@@ -94,14 +87,6 @@ def handle_answer(update: Update, context: CallbackContext) -> Step:
     try:
         keyboard = answer_keyboard
         question_notes = json.loads(db.get(update.message.chat.id))
-
-        if update.message.text == 'Мой счёт':
-            return handle_get_my_score(
-                update=update,
-                context=context,
-                step=Step.ANSWER,
-                reply_markup=keyboard,
-            )
 
         answer_notes = '\n'.join(f'{key}: {value}' for key, value in question_notes.items() if key != 'Вопрос')
         user_answer = update.message.text.lower().strip(' .,:"').replace('ё', 'е')
@@ -132,14 +117,6 @@ def handle_answer(update: Update, context: CallbackContext) -> Step:
 
     except TypeError:
         keyboard = new_question_keyboard
-
-        if update.message.text == 'Мой счёт':
-            return handle_get_my_score(
-                update=update,
-                context=context,
-                step=Step.QUESTION,
-                reply_markup=keyboard,
-            )
 
         update.message.reply_text('Я тебя не понял...\nНажми нужную кнопку 👇', reply_markup=keyboard)
 
@@ -198,15 +175,8 @@ if __name__ == '__main__':
 
     logger.info('Start Telegram bot.')
 
-    new_question_keyboard = ReplyKeyboardMarkup(
-        [['Новый вопрос'],
-         ['Мой счёт']]
-    )
-
-    answer_keyboard = ReplyKeyboardMarkup(
-        [['Сдаться'],
-         ['Мой счёт']]
-    )
+    new_question_keyboard = ReplyKeyboardMarkup([['Мой счёт', 'Новый вопрос']], resize_keyboard=True)
+    answer_keyboard = ReplyKeyboardMarkup([['Мой счёт', 'Сдаться']], resize_keyboard=True)
 
     while True:
         try:
@@ -221,14 +191,12 @@ if __name__ == '__main__':
                 ],
                 states={
                     Step.ANSWER: [
-                        CommandHandler('start', start),
-                        CommandHandler('cancel', cancel),
+                        MessageHandler(Filters.regex('Мой счёт'), handle_get_my_score),
                         MessageHandler(Filters.text, handle_answer),
                     ],
                     Step.QUESTION: [
-                        CommandHandler('start', start),
-                        CommandHandler('cancel', cancel),
-                        MessageHandler(Filters.regex('Новый вопрос|Мой счёт'), handle_new_question)
+                        MessageHandler(Filters.regex('Новый вопрос'), handle_new_question),
+                        MessageHandler(Filters.regex('Мой счёт'), handle_get_my_score),
                     ],
                 },
                 fallbacks=[CommandHandler('cancel', cancel)],
