@@ -150,14 +150,12 @@ if __name__ == '__main__':
     logger.info('Start VK bot.')
 
     new_question_keyboard = VkKeyboard(one_time=True)
-    new_question_keyboard.add_button('Новый вопрос', color=VkKeyboardColor.POSITIVE)
-    new_question_keyboard.add_line()
     new_question_keyboard.add_button('Мой счёт', color=VkKeyboardColor.SECONDARY)
+    new_question_keyboard.add_button('Новый вопрос', color=VkKeyboardColor.POSITIVE)
 
     answer_keyboard = VkKeyboard(one_time=True)
-    answer_keyboard.add_button('Сдаться', color=VkKeyboardColor.NEGATIVE)
-    answer_keyboard.add_line()
     answer_keyboard.add_button('Мой счёт', color=VkKeyboardColor.SECONDARY)
+    answer_keyboard.add_button('Сдаться', color=VkKeyboardColor.NEGATIVE)
 
     while True:
         try:
