@@ -103,11 +103,8 @@ def handle_my_score(update: Update, context: CallbackContext) -> None:
 
 def handle_new_question(update: Update, context: CallbackContext) -> Step:
     question_notes = quizzes_parser.get_question_notes()
-
-    update.message.reply_text(question_notes['Вопрос'], reply_markup=answer_keyboard)
-    update.message.reply_text(question_notes['Ответ'], reply_markup=answer_keyboard)
-
     db.set(update.message.chat.id, json.dumps(question_notes))
+    update.message.reply_text(question_notes['Вопрос'], reply_markup=answer_keyboard)
 
     return Step.ANSWER
 
