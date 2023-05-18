@@ -22,7 +22,6 @@ import quizzes_parser
 
 from bot_logger import BotLogsHandler
 
-
 logger = logging.getLogger(__file__)
 
 
@@ -31,36 +30,61 @@ class Step(Enum):
     QUESTION = 2
 
 
-def cancel(update: Update, context: CallbackContext) -> ConversationHandler.END:
-    try:
-        db.delete(update.message.chat.id)
-    except TypeError:
-        pass
+def get_answer_notes(chat_id: int) -> (str, str):
+    question_notes = json.loads(db.get(chat_id))
+    correct_answer = question_notes['Ответ'].lower().strip(' .,:!\'"').replace('ё', 'е')
+    answer_notes = '\n'.join(f'{key}: {value}' for key, value in question_notes.items() if key != 'Вопрос')
 
-    update.message.reply_text(
-        'Пока! Будет скучно - пиши 😏',
-        reply_markup=new_question_keyboard,
-    )
-
-    return Step.QUESTION
+    return answer_notes, correct_answer
 
 
-def handle_get_my_score(update: Update, context: CallbackContext):
-    conversations_step = conv_handler.conversations.get((update.message.chat.id, update.message.chat.id))
+
+
+
+def get_keyboard(chat_id: int) -> ReplyKeyboardMarkup:
+    conversations_step = conv_handler.conversations.get((chat_id, chat_id))
 
     if conversations_step is Step.ANSWER:
-        keyboard = answer_keyboard
+        return answer_keyboard
     else:
+        return new_question_keyboard
+
+
+def handle_answer(update: Update, context: CallbackContext) -> Step:
+    step = Step.ANSWER
+    keyboard = answer_keyboard
+
+    answer_notes, correct_answer = get_answer_notes(update.message.chat.id)
+    user_answer = update.message.text.lower().strip(' .,:!\'"').replace('ё', 'е')
+
+    if user_answer != correct_answer:
+        answer = 'Ответ неверный 😔\nПодумай ещё 🤔'
+
+    else:
+        step = Step.QUESTION
         keyboard = new_question_keyboard
-    update.message.reply_text(f'ТЕСТ {conversations_step} - Мой счёт', reply_markup=keyboard)
+
+        db.delete(update.message.chat.id)
+
+        answer = dedent('''\
+            Урааа! Совершенной верно 👌
+            ➕1️⃣ балл
+            Вот что у меня есть по вопросу 👇
+
+        ''') + answer_notes
+
+    update.message.reply_text(dedent(answer), reply_markup=keyboard)
+
+    return step
 
 
+def handle_fallback(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text('Я тебя не понял...', reply_markup=get_keyboard(update.message.chat.id))
 
-def handle_surrender(
-    update: Update,
-    context: CallbackContext,
-    answer_notes: str,
-):
+
+def handle_loss(update: Update, context: CallbackContext):
+    answer_notes, _ = get_answer_notes(update.message.chat.id)
+
     answer = dedent('''
         Бывает...
         Вот что у меня есть по вопросу 👇
@@ -73,59 +97,33 @@ def handle_surrender(
     return handle_new_question(update, context)
 
 
+def handle_my_score(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text(f'Мой счёт', reply_markup=get_keyboard(update.message.chat.id))
+
+
 def handle_new_question(update: Update, context: CallbackContext) -> Step:
     question_notes = quizzes_parser.get_question_notes()
 
     update.message.reply_text(question_notes['Вопрос'], reply_markup=answer_keyboard)
     update.message.reply_text(question_notes['Ответ'], reply_markup=answer_keyboard)
+
     db.set(update.message.chat.id, json.dumps(question_notes))
 
     return Step.ANSWER
 
 
-def handle_answer(update: Update, context: CallbackContext) -> Step:
-    try:
-        keyboard = answer_keyboard
-        question_notes = json.loads(db.get(update.message.chat.id))
+def send_err(update: Update, context: CallbackContext) -> None:
+    logger.error(msg='Exception during message processing:', exc_info=context.error)
 
-        answer_notes = '\n'.join(f'{key}: {value}' for key, value in question_notes.items() if key != 'Вопрос')
-        user_answer = update.message.text.lower().strip(' .,:"').replace('ё', 'е')
-        correct_answer = question_notes['Ответ'].lower().strip(' .,:"').replace('ё', 'е')
-        step = Step.QUESTION
-
-        if user_answer == correct_answer:
-            db.delete(update.message.chat.id)
-            keyboard = new_question_keyboard
-            answer = dedent('''\
-                Урааа! Совершенной верно 👌
-                ➕1️⃣ балл
-                Вот что у меня есть по вопросу 👇
-                
-            ''') + answer_notes
-
-        elif update.message.text == 'Сдаться':
-            db.delete(update.message.chat.id)
-            return handle_surrender(update, context, answer_notes)
-
-        else:
-            step = Step.ANSWER
-            answer = 'Ответ неверный 😔\nПодумай ещё 🤔'
-
-        update.message.reply_text(dedent(answer), reply_markup=keyboard)
-
-        return step
-
-    except TypeError:
-        keyboard = new_question_keyboard
-
-        update.message.reply_text('Я тебя не понял...\nНажми нужную кнопку 👇', reply_markup=keyboard)
+    if update.effective_message:
+        text = 'К сожалению произошла ошибка в момент обработки сообщения. ' \
+               'Мы уже работаем над этой проблемой.'
+        update.effective_message.reply_text(text)
 
 
 def start(update: Update, context: CallbackContext) -> Step:
-    try:
+    if db.get(update.message.chat.id):
         db.delete(update.message.chat.id)
-    except TypeError:
-        pass
 
     update.message.reply_text(
         dedent(f'''\
@@ -136,15 +134,6 @@ def start(update: Update, context: CallbackContext) -> Step:
     )
 
     return Step.QUESTION
-
-
-def send_err(update: Update, context: CallbackContext) -> None:
-    logger.error(msg='Exception during message processing:', exc_info=context.error)
-
-    if update.effective_message:
-        text = 'К сожалению произошла ошибка в момент обработки сообщения. ' \
-               'Мы уже работаем над этой проблемой.'
-        update.effective_message.reply_text(text)
 
 
 if __name__ == '__main__':
@@ -162,7 +151,6 @@ if __name__ == '__main__':
 
     bot = Bot(tg_token)
     tg_bot_name = f'@{bot.get_me().username}'
-
 
     if not admin_tg_token:
         admin_tg_token = tg_token
@@ -184,22 +172,21 @@ if __name__ == '__main__':
             dispatcher = updater.dispatcher
 
             conv_handler = ConversationHandler(
-                entry_points=[
-                    CommandHandler('start', start),
-                    CommandHandler('cancel', cancel),
-                    MessageHandler(Filters.text, handle_answer),
-                ],
+                entry_points=[CommandHandler('start', start)],
                 states={
                     Step.ANSWER: [
-                        MessageHandler(Filters.regex('Мой счёт'), handle_get_my_score),
+                        MessageHandler(Filters.regex('Сдаться'), handle_loss),
+                        MessageHandler(Filters.regex('Мой счёт'), handle_my_score),
+                        CommandHandler('start', start),
                         MessageHandler(Filters.text, handle_answer),
                     ],
                     Step.QUESTION: [
                         MessageHandler(Filters.regex('Новый вопрос'), handle_new_question),
-                        MessageHandler(Filters.regex('Мой счёт'), handle_get_my_score),
+                        MessageHandler(Filters.regex('Мой счёт'), handle_my_score),
+                        CommandHandler('start', start)
                     ],
                 },
-                fallbacks=[CommandHandler('cancel', cancel)],
+                fallbacks=[MessageHandler(Filters.all, handle_fallback)],
             )
 
             dispatcher.add_error_handler(send_err)
