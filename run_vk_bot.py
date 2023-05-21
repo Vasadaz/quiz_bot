@@ -28,7 +28,7 @@ def get_answer_notes(user_id: int, db: redis.StrictRedis) -> (str, str):
     return answer_notes, correct_answer
 
 
-def handle_answer(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRedis):
+def handle_answer(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRedis) -> None:
     keyboard = answer_keyboard.get_keyboard()
     answer_notes, correct_answer = get_answer_notes(event.user_id, db)
     user_answer = event.text.lower().strip(' .,:"').replace('ё', 'е')
@@ -63,7 +63,7 @@ def handle_fallback(event: VkEvent, vk_api: VkApiMethod) -> None:
     )
 
 
-def handle_my_score(event: VkEvent, vk_api: VkApiMethod, keyboard: VkKeyboard):
+def handle_my_score(event: VkEvent, vk_api: VkApiMethod, keyboard: VkKeyboard) -> None:
     vk_api.messages.send(
         user_id=event.user_id,
         message='Тест - Мой Счёт',
@@ -72,7 +72,7 @@ def handle_my_score(event: VkEvent, vk_api: VkApiMethod, keyboard: VkKeyboard):
     )
 
 
-def handle_new_question(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRedis):
+def handle_new_question(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRedis) -> None:
     question_notes = quizzes_parser.get_question_notes()
 
     vk_api.messages.send(
@@ -91,7 +91,7 @@ def handle_new_question(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRed
     db.set(event.user_id, json.dumps(question_notes))
 
 
-def handle_surrender(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRedis):
+def handle_surrender(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRedis) -> None:
     answer_notes, _ = get_answer_notes(event.user_id, db)
 
     answer = dedent('''\
@@ -115,7 +115,7 @@ def handle_surrender(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRedis)
     return handle_new_question(event=event, vk_api=vk_api, db=db)
 
 
-def main():
+def main() -> None:
     vk_session = vk.VkApi(token=vk_token)
     vk_api = vk_session.get_api()
     longpoll = VkLongPoll(vk_session)

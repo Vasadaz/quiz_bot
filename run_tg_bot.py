@@ -79,7 +79,7 @@ def handle_fallback(update: Update, context: CallbackContext) -> None:
     update.message.reply_text('Я тебя не понял...', reply_markup=get_keyboard(update.message.chat.id))
 
 
-def handle_loss(update: Update, context: CallbackContext):
+def handle_loss(update: Update, context: CallbackContext) -> Step:
     answer_notes, _ = get_answer_notes(update.message.chat.id)
 
     answer = dedent('''
@@ -130,7 +130,7 @@ def start(update: Update, context: CallbackContext) -> Step:
     return Step.QUESTION
 
 
-def main():
+def main() -> None:
     updater = Updater(tg_token)
     dispatcher = updater.dispatcher
     dispatcher.add_error_handler(send_err)
