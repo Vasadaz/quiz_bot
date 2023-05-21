@@ -130,6 +130,15 @@ def start(update: Update, context: CallbackContext) -> Step:
     return Step.QUESTION
 
 
+def main():
+    updater = Updater(tg_token)
+    dispatcher = updater.dispatcher
+    dispatcher.add_error_handler(send_err)
+    dispatcher.add_handler(conv_handler)
+    updater.start_polling()
+    updater.idle()
+
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(message)s')
     logger.setLevel(logging.DEBUG)
@@ -152,37 +161,30 @@ if __name__ == '__main__':
         admin_tg_chat_id=admin_tg_chat_id,
     ))
 
-    logger.info('Start Telegram bot.')
-
     new_question_keyboard = ReplyKeyboardMarkup([['Мой счёт', 'Новый вопрос']], resize_keyboard=True)
     answer_keyboard = ReplyKeyboardMarkup([['Мой счёт', 'Сдаться']], resize_keyboard=True)
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start)],
+        states={
+            Step.ANSWER: [
+                MessageHandler(Filters.regex('Сдаться'), handle_loss),
+                MessageHandler(Filters.regex('Мой счёт'), handle_my_score),
+                CommandHandler('start', start),
+                MessageHandler(Filters.text, handle_answer),
+            ],
+            Step.QUESTION: [
+                MessageHandler(Filters.regex('Новый вопрос'), handle_new_question),
+                MessageHandler(Filters.regex('Мой счёт'), handle_my_score),
+                CommandHandler('start', start)
+            ],
+        },
+        fallbacks=[MessageHandler(Filters.all, handle_fallback)],
+    )
+
+    logger.info('Start Telegram bot.')
 
     while True:
         try:
-            updater = Updater(tg_token)
-            dispatcher = updater.dispatcher
-
-            conv_handler = ConversationHandler(
-                entry_points=[CommandHandler('start', start)],
-                states={
-                    Step.ANSWER: [
-                        MessageHandler(Filters.regex('Сдаться'), handle_loss),
-                        MessageHandler(Filters.regex('Мой счёт'), handle_my_score),
-                        CommandHandler('start', start),
-                        MessageHandler(Filters.text, handle_answer),
-                    ],
-                    Step.QUESTION: [
-                        MessageHandler(Filters.regex('Новый вопрос'), handle_new_question),
-                        MessageHandler(Filters.regex('Мой счёт'), handle_my_score),
-                        CommandHandler('start', start)
-                    ],
-                },
-                fallbacks=[MessageHandler(Filters.all, handle_fallback)],
-            )
-
-            dispatcher.add_error_handler(send_err)
-            dispatcher.add_handler(conv_handler)
-
             db = redis.StrictRedis(
                 host=db_host,
                 port=db_port,
@@ -191,8 +193,7 @@ if __name__ == '__main__':
                 decode_responses=True,
             )
 
-            updater.start_polling()
-            updater.idle()
+            main()
 
         except Exception as error:
             logger.exception(error)
