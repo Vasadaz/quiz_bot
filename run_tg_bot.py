@@ -76,7 +76,10 @@ def handle_answer(update: Update, context: CallbackContext) -> Step:
 
 
 def handle_fallback(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text('Я тебя не понял...', reply_markup=get_keyboard(update.message.chat.id))
+    update.message.reply_text(
+        'Я тебя не понял...\nНажми на кнопку 👇',
+        reply_markup=get_keyboard(update.message.chat.id)
+    )
 
 
 def handle_loss(update: Update, context: CallbackContext) -> Step:

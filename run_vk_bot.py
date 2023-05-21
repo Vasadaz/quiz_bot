@@ -57,7 +57,7 @@ def handle_answer(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRedis) ->
 def handle_fallback(event: VkEvent, vk_api: VkApiMethod) -> None:
     vk_api.messages.send(
         user_id=event.user_id,
-        message='Я тебя не понял...',
+        message='Я тебя не понял...\nНажми на кнопку 👇',
         keyboard=new_question_keyboard.get_keyboard(),
         random_id=random.randint(1, 1000),
     )
@@ -78,12 +78,6 @@ def handle_new_question(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRed
     vk_api.messages.send(
         user_id=event.user_id,
         message=question_notes['Вопрос'],
-        keyboard=answer_keyboard.get_keyboard(),
-        random_id=random.randint(1, 1000),
-    )
-    vk_api.messages.send(
-        user_id=event.user_id,
-        message=question_notes['Ответ'],
         keyboard=answer_keyboard.get_keyboard(),
         random_id=random.randint(1, 1000),
     )
