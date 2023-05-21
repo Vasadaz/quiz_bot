@@ -38,9 +38,6 @@ def get_answer_notes(chat_id: int) -> (str, str):
     return answer_notes, correct_answer
 
 
-
-
-
 def get_keyboard(chat_id: int) -> ReplyKeyboardMarkup:
     conversations_step = conv_handler.conversations.get((chat_id, chat_id))
 
@@ -140,17 +137,14 @@ if __name__ == '__main__':
     env = Env()
     env.read_env()
     tg_token = env.str('TELEGRAM_BOT_TOKEN')
-    admin_tg_token = env.str('TELEGRAM_ADMIN_BOT_TOKEN', '')
-    admin_tg_chat_id = env.str('TELEGRAM_ADMIN_CHAT_ID', '')
+    admin_tg_token = env.str('TELEGRAM_ADMIN_BOT_TOKEN')
+    admin_tg_chat_id = env.str('TELEGRAM_ADMIN_CHAT_ID')
     db_host = env.str('REDIS_HOST')
     db_port = env.int('REDIS_PORT')
     db_password = env.str('REDIS_PASSWORD')
 
     bot = Bot(tg_token)
     tg_bot_name = f'@{bot.get_me().username}'
-
-    if not admin_tg_token:
-        admin_tg_token = tg_token
 
     logger.addHandler(BotLogsHandler(
         bot_name=tg_bot_name,
