@@ -20,7 +20,7 @@ from bot_logger import BotLogsHandler
 logger = logging.getLogger(__name__)
 
 
-def get_answer_notes(user_id: int) -> (str, str):
+def get_answer_notes(user_id: int, db: redis.StrictRedis) -> (str, str):
     question_notes = json.loads(db.get(user_id))
     correct_answer = question_notes['Ответ'].lower().strip(' .,:!\'"').replace('ё', 'е')
     answer_notes = '\n'.join(f'{key}: {value}' for key, value in question_notes.items() if key != 'Вопрос')
@@ -28,9 +28,9 @@ def get_answer_notes(user_id: int) -> (str, str):
     return answer_notes, correct_answer
 
 
-def handle_answer(event: VkEvent, vk_api: VkApiMethod):
+def handle_answer(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRedis):
     keyboard = answer_keyboard.get_keyboard()
-    answer_notes, correct_answer = get_answer_notes(event.user_id)
+    answer_notes, correct_answer = get_answer_notes(event.user_id, db)
     user_answer = event.text.lower().strip(' .,:"').replace('ё', 'е')
 
     if user_answer == correct_answer:
@@ -72,7 +72,7 @@ def handle_my_score(event: VkEvent, vk_api: VkApiMethod, keyboard: VkKeyboard):
     )
 
 
-def handle_new_question(event: VkEvent, vk_api: VkApiMethod):
+def handle_new_question(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRedis):
     question_notes = quizzes_parser.get_question_notes()
 
     vk_api.messages.send(
@@ -91,8 +91,8 @@ def handle_new_question(event: VkEvent, vk_api: VkApiMethod):
     db.set(event.user_id, json.dumps(question_notes))
 
 
-def handle_surrender(event: VkEvent, vk_api: VkApiMethod):
-    answer_notes, _ = get_answer_notes(event.user_id)
+def handle_surrender(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRedis):
+    answer_notes, _ = get_answer_notes(event.user_id, db)
 
     answer = dedent('''\
         Бывает...
@@ -112,7 +112,46 @@ def handle_surrender(event: VkEvent, vk_api: VkApiMethod):
         random_id=random.randint(1, 1000),
     )
 
-    return handle_new_question(event=event, vk_api=vk_api)
+    return handle_new_question(event=event, vk_api=vk_api, db=db)
+
+
+def main():
+    vk_session = vk.VkApi(token=vk_token)
+    vk_api = vk_session.get_api()
+    longpoll = VkLongPoll(vk_session)
+
+    db = redis.StrictRedis(
+        host=db_host,
+        port=db_port,
+        password=db_password,
+        charset='utf-8',
+        decode_responses=True,
+    )
+
+    for event in longpoll.listen():
+        if event.type == VkEventType.MESSAGE_NEW and event.to_me:
+            if event.text == 'Новый вопрос':
+                handle_new_question(event=event, vk_api=vk_api, db=db)
+            elif event.text == 'Сдаться':
+                handle_surrender(event=event, vk_api=vk_api, db=db)
+            elif event.text == 'Мой счёт':
+                if db.get(event.user_id):
+                    handle_my_score(
+                        event=event,
+                        vk_api=vk_api,
+                        keyboard=answer_keyboard.get_keyboard()
+                    )
+                else:
+                    handle_my_score(
+                        event=event,
+                        vk_api=vk_api,
+                        keyboard=new_question_keyboard.get_keyboard()
+                    )
+            else:
+                if db.get(event.user_id):
+                    handle_answer(event=event, vk_api=vk_api, db=db)
+                else:
+                    handle_fallback(event=event, vk_api=vk_api)
 
 
 if __name__ == '__main__':
@@ -147,42 +186,7 @@ if __name__ == '__main__':
 
     while True:
         try:
-            vk_session = vk.VkApi(token=vk_token)
-            vk_api = vk_session.get_api()
-            longpoll = VkLongPoll(vk_session)
-
-            db = redis.StrictRedis(
-                host=db_host,
-                port=db_port,
-                password=db_password,
-                charset='utf-8',
-                decode_responses=True,
-            )
-
-            for event in longpoll.listen():
-                if event.type == VkEventType.MESSAGE_NEW and event.to_me:
-                    if event.text == 'Новый вопрос':
-                        handle_new_question(event=event, vk_api=vk_api)
-                    elif event.text == 'Сдаться':
-                        handle_surrender(event=event, vk_api=vk_api)
-                    elif event.text == 'Мой счёт':
-                        if db.get(event.user_id):
-                            handle_my_score(
-                                event=event,
-                                vk_api=vk_api,
-                                keyboard=answer_keyboard.get_keyboard()
-                            )
-                        else:
-                            handle_my_score(
-                                event=event,
-                                vk_api=vk_api,
-                                keyboard=new_question_keyboard.get_keyboard()
-                            )
-                    else:
-                        if db.get(event.user_id):
-                            handle_answer(event=event, vk_api=vk_api)
-                        else:
-                            handle_fallback(event=event, vk_api=vk_api)
+            main()
 
         except Exception as error:
             logger.exception(error)
