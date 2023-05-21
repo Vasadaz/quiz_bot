@@ -17,66 +17,53 @@ import quizzes_parser
 
 from bot_logger import BotLogsHandler
 
-
 logger = logging.getLogger(__name__)
 
 
+def get_answer_notes(user_id: int) -> (str, str):
+    question_notes = json.loads(db.get(user_id))
+    correct_answer = question_notes['Ответ'].lower().strip(' .,:!\'"').replace('ё', 'е')
+    answer_notes = '\n'.join(f'{key}: {value}' for key, value in question_notes.items() if key != 'Вопрос')
+
+    return answer_notes, correct_answer
+
+
 def handle_answer(event: VkEvent, vk_api: VkApiMethod):
-    try:
-        keyboard = answer_keyboard.get_keyboard()
-        question_notes = json.loads(db.get(event.user_id))
+    keyboard = answer_keyboard.get_keyboard()
+    answer_notes, correct_answer = get_answer_notes(event.user_id)
+    user_answer = event.text.lower().strip(' .,:"').replace('ё', 'е')
 
-        if event.text == 'Мой счёт':
-            return handle_get_my_score(event=event, vk_api=vk_api, keyboard=keyboard)
-
-        answer_notes = '\n'.join(f'{key}: {value}' for key, value in question_notes.items() if key != 'Вопрос')
-        user_answer = event.text.lower().strip(' .,:"').replace('ё', 'е')
-        correct_answer = question_notes['Ответ'].lower().strip(' .,:"').replace('ё', 'е')
-
-        if event.text == 'Сдаться':
-            db.delete(event.user_id)
-            return handle_surrender(event=event, vk_api=vk_api, answer_notes=answer_notes)
-
-        if user_answer == correct_answer:
-            db.delete(event.user_id)
-            keyboard = new_question_keyboard.get_keyboard()
-            answer = dedent(f'''\
-                Урааа! Совершенной верно 👌
-                ➕1️⃣ балл
-                Вот что у меня есть по вопросу 👇
-                
-            ''') + answer_notes
-
-        elif event.text == 'Мой счёт':
-            answer = 'Тест - Мой Счёт'
-
-        else:
-            answer = 'Ответ неверный 😔\nПодумай ещё 🤔'
-
-        vk_api.messages.send(
-            user_id=event.user_id,
-            message=dedent(answer),
-            keyboard=keyboard,
-            random_id=random.randint(1, 1000),
-        )
-    except TypeError:
+    if user_answer == correct_answer:
+        db.delete(event.user_id)
         keyboard = new_question_keyboard.get_keyboard()
+        answer = dedent(f'''\
+            Урааа! Совершенной верно 👌
+            ➕1️⃣ балл
+            Вот что у меня есть по вопросу 👇
+            
+        ''') + answer_notes
 
-        if event.text == 'Мой счёт':
-            return handle_get_my_score(
-                event=event,
-                vk_api=vk_api,
-                keyboard=keyboard,
-            )
+    else:
+        answer = 'Ответ неверный 😔\nПодумай ещё 🤔'
 
-        vk_api.messages.send(
-            user_id=event.user_id,
-            message='Я тебя не понял...\nНажми нужную кнопку 👇',
-            keyboard=keyboard,
-            random_id=random.randint(1, 1000),
-        )
+    vk_api.messages.send(
+        user_id=event.user_id,
+        message=dedent(answer),
+        keyboard=keyboard,
+        random_id=random.randint(1, 1000),
+    )
 
-def handle_get_my_score(event: VkEvent, vk_api: VkApiMethod, keyboard: VkKeyboard):
+
+def handle_fallback(event: VkEvent, vk_api: VkApiMethod) -> None:
+    vk_api.messages.send(
+        user_id=event.user_id,
+        message='Я тебя не понял...',
+        keyboard=new_question_keyboard.get_keyboard(),
+        random_id=random.randint(1, 1000),
+    )
+
+
+def handle_my_score(event: VkEvent, vk_api: VkApiMethod, keyboard: VkKeyboard):
     vk_api.messages.send(
         user_id=event.user_id,
         message='Тест - Мой Счёт',
@@ -86,13 +73,6 @@ def handle_get_my_score(event: VkEvent, vk_api: VkApiMethod, keyboard: VkKeyboar
 
 
 def handle_new_question(event: VkEvent, vk_api: VkApiMethod):
-    if event.text == 'Мой счёт':
-        return handle_get_my_score(
-            event=event,
-            vk_api=vk_api,
-            keyboard=new_question_keyboard.get_keyboard()
-        )
-
     question_notes = quizzes_parser.get_question_notes()
 
     vk_api.messages.send(
@@ -101,11 +81,19 @@ def handle_new_question(event: VkEvent, vk_api: VkApiMethod):
         keyboard=answer_keyboard.get_keyboard(),
         random_id=random.randint(1, 1000),
     )
+    vk_api.messages.send(
+        user_id=event.user_id,
+        message=question_notes['Ответ'],
+        keyboard=answer_keyboard.get_keyboard(),
+        random_id=random.randint(1, 1000),
+    )
 
     db.set(event.user_id, json.dumps(question_notes))
 
 
-def handle_surrender(event: VkEvent, vk_api: VkApiMethod, answer_notes: str):
+def handle_surrender(event: VkEvent, vk_api: VkApiMethod):
+    answer_notes, _ = get_answer_notes(event.user_id)
+
     answer = dedent('''\
         Бывает...
         Вот что у меня есть по вопросу 👇
@@ -175,8 +163,27 @@ if __name__ == '__main__':
                 if event.type == VkEventType.MESSAGE_NEW and event.to_me:
                     if event.text == 'Новый вопрос':
                         handle_new_question(event=event, vk_api=vk_api)
+                    elif event.text == 'Сдаться':
+                        handle_surrender(event=event, vk_api=vk_api)
+                    elif event.text == 'Мой счёт':
+                        if db.get(event.user_id):
+                            handle_my_score(
+                                event=event,
+                                vk_api=vk_api,
+                                keyboard=answer_keyboard.get_keyboard()
+                            )
+                        else:
+                            handle_my_score(
+                                event=event,
+                                vk_api=vk_api,
+                                keyboard=new_question_keyboard.get_keyboard()
+                            )
                     else:
-                        handle_answer(event=event, vk_api=vk_api)
+                        if db.get(event.user_id):
+                            handle_answer(event=event, vk_api=vk_api)
+                        else:
+                            handle_fallback(event=event, vk_api=vk_api)
+
         except Exception as error:
             logger.exception(error)
             time.sleep(60)
