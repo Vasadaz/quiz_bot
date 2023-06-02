@@ -6,7 +6,7 @@ import traceback
 from pathlib import Path
 
 
-def get_question_notes() -> dict[str:str]:
+def get_random_question_notes() -> dict[str:str]:
     quizzes_path = Path('quizzes/quizzes_parser')
     random_quizzes_file_path = random.choice([*quizzes_path.iterdir()])
     questions = json.loads(random_quizzes_file_path.read_text(encoding='UTF-8'))

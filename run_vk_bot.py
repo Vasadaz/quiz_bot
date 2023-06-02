@@ -73,7 +73,7 @@ def handle_my_score(event: VkEvent, vk_api: VkApiMethod, keyboard: VkKeyboard) -
 
 
 def handle_new_question(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRedis) -> None:
-    question_notes = quizzes_parser.get_question_notes()
+    question_notes = quizzes_parser.get_random_question_notes()
 
     vk_api.messages.send(
         user_id=event.user_id,
