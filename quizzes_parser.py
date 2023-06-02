@@ -31,12 +31,15 @@ def parse_questions(text: str) -> dict[int:dict[str:str]]:
 def parse_question_notes(question: str, num: int) -> dict[str:str]:
     question_notes = {}
     error_str_limit = 1000
+    question_num_index = 0
+    question_notes_index = 1
+
 
     for notes in question.strip().split('\n\n'):
         notes = notes.split(':\n', maxsplit=1)
 
-        if len(notes) > 1 and '.jpg' not in notes[1]:
-            question_notes[notes[0]] = notes[1].strip()
+        if len(notes) > 1 and '.jpg' not in notes[question_notes_index]:
+            question_notes[notes[question_num_index]] = notes[question_notes_index].strip()
 
         else:
             if not quizzes_errors.get(quiz_file.name):
