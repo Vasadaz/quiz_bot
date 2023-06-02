@@ -10,12 +10,10 @@ def get_random_question_notes() -> dict[str:str]:
     quizzes_path = Path('quizzes/quizzes_parser')
     random_quizzes_file_path = random.choice([*quizzes_path.iterdir()])
     questions = json.loads(random_quizzes_file_path.read_text(encoding='UTF-8'))
-    random_num = random.randrange(1, len(questions))
+    del questions['0']
+    random_question_notes = random.choice([*questions.values()])
 
-    while not questions[str(random_num)].get('Вопрос', ''):
-        random_num = random.randrange(1, len(questions))
-
-    return questions[str(random_num)]
+    return random_question_notes
 
 
 def parse_questions(text: str) -> dict[int:dict[str:str]]:
