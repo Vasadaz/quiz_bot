@@ -126,24 +126,23 @@ def main() -> None:
         if event.type == VkEventType.MESSAGE_NEW and event.to_me:
             if event.text == 'Новый вопрос':
                 handle_new_question(event=event, vk_api=vk_api, db=db)
+
             elif event.text == 'Сдаться':
                 handle_surrender(event=event, vk_api=vk_api, db=db)
+
             elif event.text == 'Мой счёт':
                 if db.get(event.user_id):
-                    handle_my_score(
-                        event=event,
-                        vk_api=vk_api,
-                        keyboard=answer_keyboard.get_keyboard()
-                    )
+                    keyboard = answer_keyboard.get_keyboard()
+
                 else:
-                    handle_my_score(
-                        event=event,
-                        vk_api=vk_api,
-                        keyboard=new_question_keyboard.get_keyboard()
-                    )
+                    keyboard = new_question_keyboard.get_keyboard()
+
+                handle_my_score(event=event, vk_api=vk_api, keyboard=keyboard)
+
             else:
                 if db.get(event.user_id):
                     handle_answer(event=event, vk_api=vk_api, db=db)
+
                 else:
                     handle_fallback(event=event, vk_api=vk_api)
 
