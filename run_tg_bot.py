@@ -107,7 +107,6 @@ def handle_new_question(update: Update, context: CallbackContext, db: redis.Stri
     question_notes = quizzes_parser.get_random_question_notes()
     db.set(update.message.chat.id, json.dumps(question_notes))
     update.message.reply_text(question_notes['Вопрос'], reply_markup=answer_keyboard)
-    update.message.reply_text(question_notes['Ответ'], reply_markup=answer_keyboard)
 
     return Step.WAIT_ANSWER
 
