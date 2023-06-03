@@ -133,3 +133,5 @@ dmypy.json
 
 # quiz_bot
 quizzes/
+quizzes_parser/
+quizzes_parser_errors/
