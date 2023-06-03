@@ -1,14 +1,16 @@
+import argparse
 import json
 import random
 import re
-import traceback
 
 from pathlib import Path
 
 
+PARSER_FOLDER_PATH = Path('quizzes_parser')
+
+
 def get_random_question_notes() -> dict[str:str]:
-    quizzes_path = Path('quizzes/quizzes_parser')
-    random_quizzes_file_path = random.choice([*quizzes_path.iterdir()])
+    random_quizzes_file_path = random.choice([*PARSER_FOLDER_PATH.iterdir()])
     questions = json.loads(random_quizzes_file_path.read_text(encoding='UTF-8'))
     del questions['0']
     random_question_notes = random.choice([*questions.values()])
@@ -52,9 +54,14 @@ def parse_question_notes(question: str, num: int) -> dict[str:str]:
 
 
 if __name__ == '__main__':
-    quizzes_folder_path = Path('quizzes')
-    parser_folder_path = quizzes_folder_path / 'quizzes_parser'
-    parser_folder_path.mkdir(exist_ok=True)
+    parser = argparse.ArgumentParser(description='Парсинг вопросов для викторины из json файлов')
+    parser.add_argument('-p', '--path', type=str, default='quizzes', help='Введите путь к директории с json файлами, по умолчанию "quizzes"')
+    args = parser.parse_args()
+
+    quizzes_folder_path = Path(args.path)
+    parser_errors_folder_path = Path('quizzes_parser_errors')
+    PARSER_FOLDER_PATH.mkdir(exist_ok=True)
+    parser_errors_folder_path.mkdir(exist_ok=True)
 
     quizzes = {}
     quizzes_errors = {}
@@ -64,13 +71,10 @@ if __name__ == '__main__':
             quizzes[quiz_file.name] = parse_questions(quiz_file.read_text(encoding='KOI8-R'))
 
     for file_name, questions in quizzes.items():
-        file_path = parser_folder_path / file_name
+        file_path = PARSER_FOLDER_PATH / file_name
         with open(file_path.with_suffix('.json'), 'w', encoding='UTF-8') as file:
             json.dump(questions, file, ensure_ascii=False, indent=4)
 
     if quizzes_errors:
-        parser_errors_folder_path = quizzes_folder_path / 'quizzes_parser_errors'
-        parser_errors_folder_path.mkdir(exist_ok=True)
-
         with open(parser_errors_folder_path / 'errors.json', 'w', encoding='UTF-8') as file:
             json.dump(quizzes_errors, file, ensure_ascii=False, indent=4)
