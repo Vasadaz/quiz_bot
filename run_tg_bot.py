@@ -135,33 +135,6 @@ def start(update: Update, context: CallbackContext, db: redis.StrictRedis) -> St
     return Step.WAIT_NEW_QUESTION
 
 
-def main() -> None:
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
-        states={
-            Step.WAIT_ANSWER: [
-                MessageHandler(Filters.regex('Сдаться'), handle_loss),
-                MessageHandler(Filters.regex('Мой счёт'), handle_my_score_answer),
-                CommandHandler('start', start),
-                MessageHandler(Filters.text, handle_answer),
-            ],
-            Step.WAIT_NEW_QUESTION: [
-                MessageHandler(Filters.regex('Новый вопрос'), handle_new_question),
-                MessageHandler(Filters.regex('Мой счёт'), handle_my_score_new_question),
-                CommandHandler('start', start)
-            ],
-        },
-        fallbacks=[MessageHandler(Filters.all, handle_fallback)],
-    )
-
-    updater = Updater(tg_token)
-    dispatcher = updater.dispatcher
-    dispatcher.add_error_handler(send_err)
-    dispatcher.add_handler(conv_handler)
-    updater.start_polling()
-    updater.idle()
-
-
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(message)s')
     logger.setLevel(logging.DEBUG)
@@ -206,7 +179,30 @@ if __name__ == '__main__':
 
     while True:
         try:
-            main()
+            conv_handler = ConversationHandler(
+                entry_points=[CommandHandler('start', start)],
+                states={
+                    Step.WAIT_ANSWER: [
+                        MessageHandler(Filters.regex('Сдаться'), handle_loss),
+                        MessageHandler(Filters.regex('Мой счёт'), handle_my_score_answer),
+                        CommandHandler('start', start),
+                        MessageHandler(Filters.text, handle_answer),
+                    ],
+                    Step.WAIT_NEW_QUESTION: [
+                        MessageHandler(Filters.regex('Новый вопрос'), handle_new_question),
+                        MessageHandler(Filters.regex('Мой счёт'), handle_my_score_new_question),
+                        CommandHandler('start', start)
+                    ],
+                },
+                fallbacks=[MessageHandler(Filters.all, handle_fallback)],
+            )
+
+            updater = Updater(tg_token)
+            dispatcher = updater.dispatcher
+            dispatcher.add_error_handler(send_err)
+            dispatcher.add_handler(conv_handler)
+            updater.start_polling()
+            updater.idle()
 
         except Exception as error:
             logger.exception(error)

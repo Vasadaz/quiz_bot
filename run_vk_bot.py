@@ -109,44 +109,6 @@ def handle_surrender(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRedis)
     return handle_new_question(event=event, vk_api=vk_api, db=db)
 
 
-def main() -> None:
-    vk_session = vk.VkApi(token=vk_token)
-    vk_api = vk_session.get_api()
-    longpoll = VkLongPoll(vk_session)
-
-    db = redis.StrictRedis(
-        host=db_host,
-        port=db_port,
-        password=db_password,
-        charset='utf-8',
-        decode_responses=True,
-    )
-
-    for event in longpoll.listen():
-        if event.type == VkEventType.MESSAGE_NEW and event.to_me:
-            if event.text == 'Новый вопрос':
-                handle_new_question(event=event, vk_api=vk_api, db=db)
-
-            elif event.text == 'Сдаться':
-                handle_surrender(event=event, vk_api=vk_api, db=db)
-
-            elif event.text == 'Мой счёт':
-                if db.get(event.user_id):
-                    keyboard = answer_keyboard.get_keyboard()
-
-                else:
-                    keyboard = new_question_keyboard.get_keyboard()
-
-                handle_my_score(event=event, vk_api=vk_api, keyboard=keyboard)
-
-            else:
-                if db.get(event.user_id):
-                    handle_answer(event=event, vk_api=vk_api, db=db)
-
-                else:
-                    handle_fallback(event=event, vk_api=vk_api)
-
-
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(message)s')
     logger.setLevel(logging.DEBUG)
@@ -179,7 +141,41 @@ if __name__ == '__main__':
 
     while True:
         try:
-            main()
+            vk_session = vk.VkApi(token=vk_token)
+            vk_api = vk_session.get_api()
+            longpoll = VkLongPoll(vk_session)
+
+            db = redis.StrictRedis(
+                host=db_host,
+                port=db_port,
+                password=db_password,
+                charset='utf-8',
+                decode_responses=True,
+            )
+
+            for event in longpoll.listen():
+                if event.type == VkEventType.MESSAGE_NEW and event.to_me:
+                    if event.text == 'Новый вопрос':
+                        handle_new_question(event=event, vk_api=vk_api, db=db)
+
+                    elif event.text == 'Сдаться':
+                        handle_surrender(event=event, vk_api=vk_api, db=db)
+
+                    elif event.text == 'Мой счёт':
+                        if db.get(event.user_id):
+                            keyboard = answer_keyboard.get_keyboard()
+
+                        else:
+                            keyboard = new_question_keyboard.get_keyboard()
+
+                        handle_my_score(event=event, vk_api=vk_api, keyboard=keyboard)
+
+                    else:
+                        if db.get(event.user_id):
+                            handle_answer(event=event, vk_api=vk_api, db=db)
+
+                        else:
+                            handle_fallback(event=event, vk_api=vk_api)
 
         except Exception as error:
             logger.exception(error)
