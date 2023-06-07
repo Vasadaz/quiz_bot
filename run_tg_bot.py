@@ -24,7 +24,9 @@ import quizzes_parser
 from bot_logger import BotLogsHandler
 
 
-logger = logging.getLogger(__file__)
+LOGGER = logging.getLogger(__file__)
+NEW_QUESTION_KEYBOARD = ReplyKeyboardMarkup([['Мой счёт', 'Новый вопрос']], resize_keyboard=True)
+ANSWER_KEYBOARD = ReplyKeyboardMarkup([['Мой счёт', 'Сдаться']], resize_keyboard=True)
 
 
 class Step(Enum):
@@ -42,15 +44,15 @@ def get_answer_notes(chat_id: int, db: redis.StrictRedis) -> (str, str):
 
 def get_keyboard(chat_id: int, step: Step) -> ReplyKeyboardMarkup:
     if step is Step.WAIT_ANSWER:
-        return answer_keyboard
+        return ANSWER_KEYBOARD
     else:
-        return new_question_keyboard
+        return NEW_QUESTION_KEYBOARD
 
 
 def handle_answer(update: Update, context: CallbackContext, db: redis.StrictRedis) -> Step:
 
     step = Step.WAIT_ANSWER
-    keyboard = answer_keyboard
+    keyboard = ANSWER_KEYBOARD
 
     answer_notes, correct_answer = get_answer_notes(update.message.chat.id, db)
     user_answer = update.message.text.lower().strip(' .,:!\'"').replace('ё', 'е')
@@ -60,7 +62,7 @@ def handle_answer(update: Update, context: CallbackContext, db: redis.StrictRedi
 
     else:
         step = Step.WAIT_NEW_QUESTION
-        keyboard = new_question_keyboard
+        keyboard = NEW_QUESTION_KEYBOARD
 
         db.delete(update.message.chat.id)
 
@@ -96,7 +98,7 @@ def handle_loss(update: Update, context: CallbackContext, db: redis.StrictRedis)
     update.message.reply_text(answer)
     update.message.reply_text('Лови новый вопрос 👇')
 
-    return handle_new_question(update, context)
+    return handle_new_question(update=update, context=context, db=db)
 
 
 def handle_my_score(update: Update, context: CallbackContext, step: Step, db: redis.StrictRedis) -> None:
@@ -106,21 +108,12 @@ def handle_my_score(update: Update, context: CallbackContext, step: Step, db: re
 def handle_new_question(update: Update, context: CallbackContext, db: redis.StrictRedis) -> Step:
     question_notes = quizzes_parser.get_random_question_notes()
     db.set(update.message.chat.id, json.dumps(question_notes))
-    update.message.reply_text(question_notes['Вопрос'], reply_markup=answer_keyboard)
+    update.message.reply_text(question_notes['Вопрос'], reply_markup=ANSWER_KEYBOARD)
 
     return Step.WAIT_ANSWER
 
 
-def send_err(update: Update, context: CallbackContext) -> None:
-    logger.error(msg='Exception during message processing:', exc_info=context.error)
-
-    if update.effective_message:
-        text = 'К сожалению произошла ошибка в момент обработки сообщения. ' \
-               'Мы уже работаем над этой проблемой.'
-        update.effective_message.reply_text(text)
-
-
-def start(update: Update, context: CallbackContext, db: redis.StrictRedis) -> Step:
+def handle_start(update: Update, context: CallbackContext, db: redis.StrictRedis) -> Step:
     if db.get(update.message.chat.id):
         db.delete(update.message.chat.id)
 
@@ -129,15 +122,27 @@ def start(update: Update, context: CallbackContext, db: redis.StrictRedis) -> St
             {update.effective_user.full_name}, будем знакомы - я Бот Ботыч 😍
             Давай сыграем в викторину?!
         '''),
-        reply_markup=new_question_keyboard,
+        reply_markup=NEW_QUESTION_KEYBOARD,
     )
 
     return Step.WAIT_NEW_QUESTION
 
 
-if __name__ == '__main__':
+def send_err(update: Update, context: CallbackContext) -> None:
+    LOGGER.error(msg='Exception during message processing:', exc_info=context.error)
+
+    if update.effective_message:
+        text = 'К сожалению произошла ошибка в момент обработки сообщения. ' \
+               'Мы уже работаем над этой проблемой.'
+        update.effective_message.reply_text(text)
+
+
+
+
+
+def main():
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(message)s')
-    logger.setLevel(logging.DEBUG)
+    LOGGER.setLevel(logging.DEBUG)
 
     env = Env()
     env.read_env()
@@ -151,14 +156,11 @@ if __name__ == '__main__':
     bot = Bot(tg_token)
     tg_bot_name = f'@{bot.get_me().username}'
 
-    logger.addHandler(BotLogsHandler(
+    LOGGER.addHandler(BotLogsHandler(
         bot_name=tg_bot_name,
         admin_tg_token=admin_tg_token,
         admin_tg_chat_id=admin_tg_chat_id,
     ))
-
-    new_question_keyboard = ReplyKeyboardMarkup([['Мой счёт', 'Новый вопрос']], resize_keyboard=True)
-    answer_keyboard = ReplyKeyboardMarkup([['Мой счёт', 'Сдаться']], resize_keyboard=True)
 
     db = redis.StrictRedis(
         host=db_host,
@@ -167,31 +169,30 @@ if __name__ == '__main__':
         charset='utf-8',
         decode_responses=True,
     )
+    handle_start_private = partial(handle_start, db=db)
+    handle_loss_private = partial(handle_loss, db=db)
+    handle_my_score_answer_private = partial(handle_my_score, db=db, step=Step.WAIT_ANSWER)
+    handle_my_score_new_question_private = partial(handle_my_score, db=db, step=Step.WAIT_NEW_QUESTION)
+    handle_answer_private = partial(handle_answer, db=db)
+    handle_new_question_private = partial(handle_new_question, db=db)
 
-    start = partial(start, db=db)
-    handle_loss = partial(handle_loss, db=db)
-    handle_my_score_answer = partial(handle_my_score, db=db, step=Step.WAIT_ANSWER)
-    handle_my_score_new_question = partial(handle_my_score, db=db, step=Step.WAIT_NEW_QUESTION)
-    handle_answer = partial(handle_answer, db=db)
-    handle_new_question = partial(handle_new_question, db=db)
-
-    logger.info('Start Telegram bot.')
+    LOGGER.info('Start Telegram bot.')
 
     while True:
         try:
             conv_handler = ConversationHandler(
-                entry_points=[CommandHandler('start', start)],
+                entry_points=[CommandHandler('start', handle_start_private)],
                 states={
                     Step.WAIT_ANSWER: [
-                        MessageHandler(Filters.regex('Сдаться'), handle_loss),
-                        MessageHandler(Filters.regex('Мой счёт'), handle_my_score_answer),
-                        CommandHandler('start', start),
-                        MessageHandler(Filters.text, handle_answer),
+                        MessageHandler(Filters.regex('Сдаться'), handle_loss_private),
+                        MessageHandler(Filters.regex('Мой счёт'), handle_my_score_answer_private),
+                        CommandHandler('start', handle_start_private),
+                        MessageHandler(Filters.text, handle_answer_private),
                     ],
                     Step.WAIT_NEW_QUESTION: [
-                        MessageHandler(Filters.regex('Новый вопрос'), handle_new_question),
-                        MessageHandler(Filters.regex('Мой счёт'), handle_my_score_new_question),
-                        CommandHandler('start', start)
+                        MessageHandler(Filters.regex('Новый вопрос'), handle_new_question_private),
+                        MessageHandler(Filters.regex('Мой счёт'), handle_my_score_new_question_private),
+                        CommandHandler('start', handle_start_private)
                     ],
                 },
                 fallbacks=[MessageHandler(Filters.all, handle_fallback)],
@@ -205,5 +206,9 @@ if __name__ == '__main__':
             updater.idle()
 
         except Exception as error:
-            logger.exception(error)
+            LOGGER.exception(error)
             time.sleep(60)
+
+
+if __name__ == '__main__':
+    main()

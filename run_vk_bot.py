@@ -17,7 +17,15 @@ import quizzes_parser
 
 from bot_logger import BotLogsHandler
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
+
+NEW_QUESTION_KEYBOARD = VkKeyboard(one_time=True)
+NEW_QUESTION_KEYBOARD.add_button('Мой счёт', color=VkKeyboardColor.SECONDARY)
+NEW_QUESTION_KEYBOARD.add_button('Новый вопрос', color=VkKeyboardColor.POSITIVE)
+
+ANSWER_KEYBOARD = VkKeyboard(one_time=True)
+ANSWER_KEYBOARD.add_button('Мой счёт', color=VkKeyboardColor.SECONDARY)
+ANSWER_KEYBOARD.add_button('Сдаться', color=VkKeyboardColor.NEGATIVE)
 
 
 def get_answer_notes(user_id: int, db: redis.StrictRedis) -> (str, str):
@@ -29,13 +37,13 @@ def get_answer_notes(user_id: int, db: redis.StrictRedis) -> (str, str):
 
 
 def handle_answer(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRedis) -> None:
-    keyboard = answer_keyboard.get_keyboard()
+    keyboard = ANSWER_KEYBOARD.get_keyboard()
     answer_notes, correct_answer = get_answer_notes(event.user_id, db)
     user_answer = event.text.lower().strip(' .,:"').replace('ё', 'е')
 
     if user_answer == correct_answer:
         db.delete(event.user_id)
-        keyboard = new_question_keyboard.get_keyboard()
+        keyboard = NEW_QUESTION_KEYBOARD.get_keyboard()
         answer = dedent(f'''\
             Урааа! Совершенной верно 👌
             ➕1️⃣ балл
@@ -58,7 +66,7 @@ def handle_fallback(event: VkEvent, vk_api: VkApiMethod) -> None:
     vk_api.messages.send(
         user_id=event.user_id,
         message='Я тебя не понял...\nНажми на кнопку 👇',
-        keyboard=new_question_keyboard.get_keyboard(),
+        keyboard=NEW_QUESTION_KEYBOARD.get_keyboard(),
         random_id=random.randint(1, 1000),
     )
 
@@ -78,7 +86,7 @@ def handle_new_question(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRed
     vk_api.messages.send(
         user_id=event.user_id,
         message=question_notes['Вопрос'],
-        keyboard=answer_keyboard.get_keyboard(),
+        keyboard=ANSWER_KEYBOARD.get_keyboard(),
         random_id=random.randint(1, 1000),
     )
 
@@ -109,9 +117,9 @@ def handle_surrender(event: VkEvent, vk_api: VkApiMethod, db: redis.StrictRedis)
     return handle_new_question(event=event, vk_api=vk_api, db=db)
 
 
-if __name__ == '__main__':
+def main():
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(message)s')
-    logger.setLevel(logging.DEBUG)
+    LOGGER.setLevel(logging.DEBUG)
 
     env = Env()
     env.read_env()
@@ -123,21 +131,13 @@ if __name__ == '__main__':
     db_port = env.int('REDIS_PORT')
     db_password = env.str('REDIS_PASSWORD')
 
-    logger.addHandler(BotLogsHandler(
+    LOGGER.addHandler(BotLogsHandler(
         bot_name=vk_bot_name,
         admin_tg_token=admin_tg_token,
         admin_tg_chat_id=admin_tg_chat_id,
     ))
 
-    logger.info('Start VK bot.')
-
-    new_question_keyboard = VkKeyboard(one_time=True)
-    new_question_keyboard.add_button('Мой счёт', color=VkKeyboardColor.SECONDARY)
-    new_question_keyboard.add_button('Новый вопрос', color=VkKeyboardColor.POSITIVE)
-
-    answer_keyboard = VkKeyboard(one_time=True)
-    answer_keyboard.add_button('Мой счёт', color=VkKeyboardColor.SECONDARY)
-    answer_keyboard.add_button('Сдаться', color=VkKeyboardColor.NEGATIVE)
+    LOGGER.info('Start VK bot.')
 
     while True:
         try:
@@ -163,10 +163,10 @@ if __name__ == '__main__':
 
                     elif event.text == 'Мой счёт':
                         if db.get(event.user_id):
-                            keyboard = answer_keyboard.get_keyboard()
+                            keyboard = ANSWER_KEYBOARD.get_keyboard()
 
                         else:
-                            keyboard = new_question_keyboard.get_keyboard()
+                            keyboard = NEW_QUESTION_KEYBOARD.get_keyboard()
 
                         handle_my_score(event=event, vk_api=vk_api, keyboard=keyboard)
 
@@ -178,5 +178,9 @@ if __name__ == '__main__':
                             handle_fallback(event=event, vk_api=vk_api)
 
         except Exception as error:
-            logger.exception(error)
+            LOGGER.exception(error)
             time.sleep(60)
+
+
+if __name__ == '__main__':
+    main()
