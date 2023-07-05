@@ -137,9 +137,6 @@ def send_err(update: Update, context: CallbackContext) -> None:
         update.effective_message.reply_text(text)
 
 
-
-
-
 def main():
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(message)s')
     LOGGER.setLevel(logging.DEBUG)
